@@ -1,0 +1,19 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+
+# Segredos: nunca versionar
+.env
+
+# Dados locais (banco, comprovantes, índice vetorial)
+data/*.db
+data/chroma/
+data/comprovantes/*
+!data/comprovantes/.gitkeep
+
+# IDE
+.vscode/
+.idea/
