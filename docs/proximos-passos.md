@@ -8,7 +8,7 @@
    [avaliacao-extracao.md](avaliacao-extracao.md) e preencher uma coluna por modelo
    (principalmente produto e dia da data do DANFE, que o modelo local erra).
 3. **Categoria na busca por significado.** O produto agora tem o campo `Categoria`
-   (Eletrodomésticos, Eletrônicos, Ferramentas), escolhido pelo usuário. Falta fazê-la entrar no
+   (Eletrodomésticos, Eletrônicos, Ferramentas, Vestuário, Móveis, Brinquedos, Automotivo, Outros), escolhido pelo usuário. Falta fazê-la entrar no
    texto indexado junto com o nome e, com o Claude, sugerir a categoria ao ler a nota.
    Motivo: "Moto G60 128GB - AZUL" tem similaridade 0,467 com "celular" (abaixo do corte de 0,5);
    com "celular smartphone" no texto vai a 0,578. O modelo local (llama3.2:3b) errou a categoria

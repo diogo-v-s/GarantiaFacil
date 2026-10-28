@@ -12,6 +12,11 @@ class Categoria(str, Enum):
     ELETRODOMESTICOS = "Eletrodomésticos"
     ELETRONICOS = "Eletrônicos"
     FERRAMENTAS = "Ferramentas"
+    VESTUARIO = "Vestuário"
+    MOVEIS = "Móveis"
+    BRINQUEDOS = "Brinquedos"
+    AUTOMOTIVO = "Automotivo"
+    OUTROS = "Outros"  # o que não se encaixa nas demais
 
 
 class TipoDocumento(str, Enum):

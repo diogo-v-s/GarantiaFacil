@@ -22,8 +22,9 @@ RAIZ = Path(__file__).resolve().parents[2]  # pasta do projeto
 PASTA_DADOS = RAIZ / "data"
 CAMINHO_BANCO = PASTA_DADOS / "garantiafacil.db"
 
-SCHEMA = f"""
-CREATE TABLE IF NOT EXISTS produtos (
+def _ddl_produtos(nome: str) -> str:
+    return f"""
+CREATE TABLE IF NOT EXISTS {nome} (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     nome TEXT NOT NULL,
     loja TEXT NOT NULL,
@@ -34,7 +35,11 @@ CREATE TABLE IF NOT EXISTS produtos (
     {_COLUNA_CATEGORIA},
     {_COLUNA_FOTO}
 );
+"""
 
+
+SCHEMA = f"""
+{_ddl_produtos("produtos")}
 -- Vetor de significado de cada produto (embedding), guardado como bytes de float32.
 -- Guardamos o modelo: se ele mudar, os vetores antigos não servem mais.
 CREATE TABLE IF NOT EXISTS embeddings (
@@ -88,6 +93,7 @@ def _migrar(conexao: sqlite3.Connection) -> None:
     _garantir_coluna(conexao, "produtos", "categoria", _COLUNA_CATEGORIA)
     _garantir_coluna(conexao, "produtos", "foto", _COLUNA_FOTO)
     _garantir_coluna(conexao, "comprovantes", "tipo", _COLUNA_TIPO)
+    _atualizar_regra_categorias(conexao)
 
 
 def _garantir_coluna(conexao: sqlite3.Connection, tabela: str, coluna: str, definicao: str) -> None:
@@ -95,3 +101,30 @@ def _garantir_coluna(conexao: sqlite3.Connection, tabela: str, coluna: str, defi
     if coluna not in colunas:
         conexao.execute(f"ALTER TABLE {tabela} ADD COLUMN {definicao}")
         conexao.commit()
+
+
+def _atualizar_regra_categorias(conexao: sqlite3.Connection) -> None:
+    """O SQLite não deixa alterar um CHECK existente. Se o banco foi criado com uma lista menor
+    de categorias, refazemos a tabela `produtos` (receita oficial do SQLite: criar a nova,
+    copiar, apagar a antiga e renomear) com a regra atual, sem perder nenhum dado."""
+    linha = conexao.execute(
+        "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'produtos'"
+    ).fetchone()
+    if all(f"'{c.value}'" in linha["sql"] for c in Categoria):
+        return
+
+    colunas = "id, nome, loja, data_compra, prazo_garantia_meses, valor, observacoes, categoria, foto"
+    # foreign_keys desligado: senão apagar `produtos` apagaria, em cascata, embeddings,
+    # trechos e comprovantes. O executescript fecha a transação anterior antes de começar.
+    conexao.executescript(
+        f"""
+        PRAGMA foreign_keys = OFF;
+        BEGIN;
+        {_ddl_produtos("produtos_novo")}
+        INSERT INTO produtos_novo ({colunas}) SELECT {colunas} FROM produtos;
+        DROP TABLE produtos;
+        ALTER TABLE produtos_novo RENAME TO produtos;
+        COMMIT;
+        PRAGMA foreign_keys = ON;
+        """
+    )

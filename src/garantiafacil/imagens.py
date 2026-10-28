@@ -33,10 +33,37 @@ _CAIXA = _svg(
     '<path d="M10 19 L32 30 L54 19"/><line x1="32" y1="30" x2="32" y2="56"/>'
 )
 
+_CAMISETA = _svg(
+    '<path d="M22 10 L10 18 L16 27 L22 24 V54 H42 V24 L48 27 L54 18 L42 10 '
+    'C40 15 24 15 22 10 Z"/>'
+)
+_SOFA = _svg(
+    '<rect x="14" y="14" width="36" height="18" rx="5"/>'
+    '<rect x="8" y="30" width="48" height="16" rx="5"/>'
+    '<line x1="16" y1="46" x2="16" y2="53"/><line x1="48" y1="46" x2="48" y2="53"/>'
+)
+_URSO = _svg(
+    '<circle cx="32" cy="35" r="16"/><circle cx="19" cy="21" r="6"/><circle cx="45" cy="21" r="6"/>'
+    '<circle cx="26" cy="32" r="1.5"/><circle cx="38" cy="32" r="1.5"/><circle cx="32" cy="40" r="3"/>'
+)
+_CARRO = _svg(
+    '<path d="M8 42 V34 C8 32 9 31 11 30 L18 20 H42 L50 30 H54 C56 30 57 32 57 34 V42 Z"/>'
+    '<line x1="31" y1="20" x2="31" y2="30"/>'
+    '<circle cx="20" cy="44" r="6"/><circle cx="45" cy="44" r="6"/>'
+)
+_ETIQUETA = _svg(
+    '<path d="M10 34 L34 10 H52 V28 L28 52 Z"/><circle cx="43" cy="19" r="3"/>'
+)
+
 IMAGEM_PADRAO = {
     Categoria.ELETRODOMESTICOS: _GELADEIRA,
     Categoria.ELETRONICOS: _TELEVISAO,
     Categoria.FERRAMENTAS: _MARTELO,
+    Categoria.VESTUARIO: _CAMISETA,
+    Categoria.MOVEIS: _SOFA,
+    Categoria.BRINQUEDOS: _URSO,
+    Categoria.AUTOMOTIVO: _CARRO,
+    Categoria.OUTROS: _ETIQUETA,
 }
 
 

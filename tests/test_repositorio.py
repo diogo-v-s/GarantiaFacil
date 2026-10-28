@@ -327,3 +327,50 @@ def test_banco_antigo_com_comprovantes_sem_tipo_e_migrado(tmp_path):
 
     assert repo.listar()[0].foto is None
     assert repo.listar_comprovantes(1)[0].tipo is TipoDocumento.NOTA_FISCAL
+
+
+def test_banco_com_regra_antiga_de_categorias_e_reconstruido_sem_perder_dados(tmp_path):
+    import sqlite3
+
+    from garantiafacil.modelos import Categoria
+
+    caminho = tmp_path / "antigo.db"
+    antigo = sqlite3.connect(caminho)
+    antigo.executescript(
+        "CREATE TABLE produtos (id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT NOT NULL, "
+        "loja TEXT NOT NULL, data_compra TEXT NOT NULL, prazo_garantia_meses INTEGER NOT NULL, "
+        "valor REAL, observacoes TEXT NOT NULL DEFAULT '', "
+        "categoria TEXT CHECK (categoria IN ('Eletrodomésticos', 'Eletrônicos', 'Ferramentas')), "
+        "foto TEXT);"
+        "CREATE TABLE embeddings (produto_id INTEGER PRIMARY KEY REFERENCES produtos(id) "
+        "ON DELETE CASCADE, modelo TEXT NOT NULL, vetor BLOB NOT NULL);"
+        "INSERT INTO produtos (nome, loja, data_compra, prazo_garantia_meses, categoria, foto) "
+        "VALUES ('Furadeira', 'Loja', '2026-01-01', 12, 'Ferramentas', 'f.jpg');"
+        "INSERT INTO produtos (nome, loja, data_compra, prazo_garantia_meses) "
+        "VALUES ('Xbox', 'Loja', '2026-02-01', 12);"
+        "INSERT INTO embeddings VALUES (1, 'm', x'00');"
+    )
+    antigo.commit()
+    antigo.close()
+
+    repo = Repositorio(conectar(caminho), gerar_embedding=embedding_falso, nome_modelo=lambda: "f")
+
+    furadeira = repo.obter(1)
+    assert furadeira.categoria is Categoria.FERRAMENTAS and furadeira.foto == "f.jpg"
+    assert repo.obter(2).categoria is None
+    repo.atualizar_categoria(2, Categoria.OUTROS)  # a regra nova aceita as categorias novas
+    assert repo.obter(2).categoria is Categoria.OUTROS
+
+    # as ligações com as outras tabelas continuam valendo (exclusão em cascata)
+    assert repo.conexao.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0] == 1
+    repo.excluir(1)
+    assert repo.conexao.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0] == 0
+
+
+def test_reconstruir_so_acontece_uma_vez(tmp_path):
+    caminho = tmp_path / "novo.db"
+    conectar(caminho).close()
+
+    conexao = conectar(caminho)  # segunda abertura: a regra já está atual, nada a refazer
+
+    assert conexao.execute("SELECT name FROM sqlite_master WHERE name = 'produtos_novo'").fetchone() is None
