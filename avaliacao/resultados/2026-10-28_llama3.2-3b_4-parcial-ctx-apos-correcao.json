@@ -1,0 +1,64 @@
+{
+  "modelo": "llama3.2:3b",
+  "data_simulada": "2026-10-28",
+  "nota": "3/4",
+  "resultados": [
+    {
+      "caso": "ctx-01-responde-qual",
+      "tipo": "contexto",
+      "passou": true,
+      "falhas": [],
+      "rota": "documentos_produto",
+      "ferramentas": [],
+      "texto": "Não, de acordo com o trecho [3], a garantia não cobre tela quebrada ou trincada por impacto.",
+      "segundos": 30.678573299999698,
+      "opcional": false,
+      "produto": "Smart TV Samsung 50"
+    },
+    {
+      "caso": "ctx-02-desse-produto",
+      "tipo": "contexto",
+      "passou": true,
+      "falhas": [],
+      "rota": "sem_termo",
+      "ferramentas": [],
+      "texto": "Não há termo de garantia cadastrado para 'Furadeira Bosch'. Pelo CDC:\n\nA garantia legal prevista no Código de Defesa do Consumidor cobre:\n\n* Vícios de qualidade ou quantidade que tornem o produto impróprio ou inadequado ao consumo;\n* Vícios decorrentes da disparidade das indicações constantes do recipiente, da embalagem, rotulagem ou mensagem publicitária;\n* A substituição das partes viciadas;\n* A restituição imediata da quantia paga, monetariamente atualizada, sem prejuízo de eventuais perdas e danos;\n* O abatimento proporcional do preço.\n\nAlém disso, a garantia também inclui a substituição do produto por outro da mesma espécie, em perfeitas condições de uso, sempre que o consumidor optar por isso.",
+      "segundos": 64.32015939999837,
+      "opcional": false,
+      "produto": "Furadeira Bosch"
+    },
+    {
+      "caso": "ctx-03-e-o-prazo",
+      "tipo": "contexto",
+      "passou": false,
+      "falhas": [
+        "faltou qualquer um de: ['12', 'doze', '15/12/2026']"
+      ],
+      "rota": "documentos_produto",
+      "ferramentas": [],
+      "texto": "Não encontrei essa informação nos documentos.",
+      "segundos": 50.29121309999755,
+      "opcional": false,
+      "produto": "Smart TV Samsung 50"
+    },
+    {
+      "caso": "ctx-04-e-os-vencidos",
+      "tipo": "contexto",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "listar_produtos",
+          {
+            "status": "vencida"
+          }
+        ]
+      ],
+      "texto": "Você tem um iPhone 15 que já venceu sua garantia, que termina em 22/03/2026.",
+      "segundos": 51.47699239999929,
+      "opcional": false,
+      "produto": "iPhone 15"
+    }
+  ]
+}

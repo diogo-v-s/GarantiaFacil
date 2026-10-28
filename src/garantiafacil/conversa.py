@@ -12,49 +12,96 @@ Fluxo de cada mensagem:
 import re
 import unicodedata
 from dataclasses import dataclass, field
+from datetime import date
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
+from garantiafacil.agente import Consulta, executar_agente
+from garantiafacil.ferramentas_cadastro import criar_ferramentas, sistema_agente
+from garantiafacil.localizar import localizar_produto
 from garantiafacil.modelos import Produto
-from garantiafacil.rag import BaseConhecimento, TrechoEncontrado
+from garantiafacil.rag import NAO_ENCONTREI, BaseConhecimento, TrechoEncontrado
 
 SISTEMA_ANALISE = (
-    "Você classifica perguntas de um usuário que consulta garantias de produtos que comprou.\n"
-    "- precisa_produto = true quando a pergunta só pode ser respondida sabendo de QUAL produto "
-    "o usuário fala (o que a garantia do produto cobre, o prazo do aparelho dele, bateria, "
-    "tela, assistência técnica do produto).\n"
-    "- precisa_produto = false quando for uma pergunta geral sobre direitos do consumidor ou "
-    "sobre a lei, sem depender de um produto específico.\n"
-    "- produto_citado = o nome ou descrição do produto, copiado das palavras do usuário. "
-    "Deixe vazio se ele não citou nenhum produto.\n\n"
+    "Você classifica a pergunta de um usuário que guarda as notas e garantias dos produtos que comprou.\n"
+    "assunto = cadastro: pergunta sobre os produtos que ele cadastrou (quais tem, quando comprou, "
+    "quando vence a garantia, quanto pagou, o que vence nos próximos dias).\n"
+    "assunto = lei: pergunta geral sobre direitos do consumidor ou prazos da lei.\n"
+    "assunto = produto: pergunta sobre o que a garantia, o termo, a cobertura ou a assistência de "
+    "um produto específico dele.\n"
+    "produto_citado = o nome ou a descrição do produto, copiado das palavras do usuário; vazio se "
+    "ele não citou nenhum.\n\n"
     "Exemplos:\n"
-    "'A garantia cobre tela quebrada?' -> precisa_produto true, produto_citado ''\n"
-    "'A garantia do meu celular Moto G60 cobre a bateria?' -> true, 'celular Moto G60'\n"
-    "'Qual o prazo do CDC para reclamar de defeito?' -> false, ''\n"
-    "'Posso desistir de uma compra feita pela internet?' -> false, ''"
+    "'Que produtos eu já cadastrei?' -> cadastro\n"
+    "'Em que dia vence a garantia do meu fogão?' -> cadastro\n"
+    "'Qual foi o preço que paguei no monitor?' -> cadastro\n"
+    "'Algum aparelho meu está com a garantia acabando?' -> cadastro\n"
+    "'O que vai vencer este mês?' -> cadastro\n"
+    "'Qual dos meus aparelhos perde a garantia primeiro?' -> cadastro\n"
+    "'Em quantos dias posso me arrepender de uma compra?' -> lei\n"
+    "'O que o código do consumidor diz sobre propaganda enganosa?' -> lei\n"
+    "'Até quando posso exigir conserto de um produto estragado?' -> lei\n"
+    "'O termo do meu fogão cobre queimadura na mesa?' -> produto\n"
+    "'O liquidificador tem assistência em qualquer cidade?' -> produto\n"
+    "'O que a garantia do meu ventilador não cobre?' -> produto"
 )
 
 # Menos trechos = prompt menor = resposta mais rápida na CPU, mas o modelo vê menos contexto.
 # Era 5; voltar a 5 (ou mais) quando o chat passar para o Claude.
 TRECHOS_POR_RESPOSTA = 3
 
-_PALAVRAS_VAZIAS = {
-    "de", "da", "do", "das", "dos", "o", "a", "os", "as", "um", "uma", "meu", "minha",
-    "no", "na", "com", "para", "por", "e",
-}  # fmt: skip
+# Resposta do usuário que é só a posição de uma opção: "2", "o 2", "número 2", "o primeiro".
+_ORDINAIS = {"primeiro": 1, "primeira": 1, "segundo": 2, "segunda": 2, "terceiro": 3, "terceira": 3,
+             "quarto": 4, "quarta": 4, "quinto": 5, "quinta": 5}  # fmt: skip
+_RESPOSTA_POSICAO = re.compile(
+    r"^(?:(?:o|a|numero|opcao|n)\s*)?(?:(?P<n>\d+)|(?P<ord>" + "|".join(_ORDINAIS) + r"))$"
+)
+
+# Produto sem termo de garantia: vale a garantia legal do CDC. A pergunta do usuário
+# ("o que a garantia cobre?") nem sempre acha os artigos certos (medimos: trouxe o art. 50 em vez
+# dos arts. 18 e 26), então buscamos a garantia legal direto, além da pergunta.
+CONSULTA_GARANTIA_LEGAL = (
+    "vício do produto: prazo para reclamar de produto durável noventa dias, substituição, "
+    "conserto ou restituição do valor pago"
+)
+
+SISTEMA_SEM_TERMO = (
+    "O produto do usuário não tem termo de garantia cadastrado, então vale a garantia legal do "
+    "Código de Defesa do Consumidor. Com base nos trechos, explique em português o que a lei "
+    "prevê sobre a pergunta (defeitos, prazos para reclamar, o que o consumidor pode exigir), "
+    "citando o número do trecho, como [1]. Responda em no máximo 5 linhas, sem repetir a "
+    "pergunta e sem introdução. Cite apenas números de trechos que existem. "
+    "Se os trechos não tratarem exatamente da pergunta, explique o que a lei garante em geral. "
+    "Não diga que não encontrou."
+)
 
 
 class Analise(BaseModel):
-    """Classificação da pergunta. Campos obrigatórios: com null opcional o modelo local
-    deixava tudo vazio (mesma lição da leitura de nota fiscal)."""
+    """Classificação da pergunta, numa escolha de 3 opções.
 
-    precisa_produto: bool = Field(
-        description="true se a resposta depende de qual produto específico o usuário tem"
+    Antes eram dois campos sim/não (sobre_cadastro e precisa_produto) e o modelo local caía no
+    "não" nos dois: acertava 64% dos casos da avaliação. Com uma escolha entre 3 opções, 77%
+    (medido com exemplos que não repetem os casos de teste). Campos obrigatórios, como sempre."""
+
+    assunto: Literal["cadastro", "lei", "produto"] = Field(
+        description=(
+            "cadastro = pede dados dos produtos que o usuário cadastrou (quais, datas, valores, o que "
+            "vence); lei = pergunta geral sobre direitos do consumidor, sem citar um produto dele; "
+            "produto = pergunta o que a garantia ou o termo de UM produto específico cobre ou exige"
+        )
     )
     produto_citado: str = Field(
         description="Produto citado pelo usuário, nas palavras dele; vazio se não citou"
     )
 
+    @property
+    def sobre_cadastro(self) -> bool:
+        return self.assunto == "cadastro"
+
+    @property
+    def precisa_produto(self) -> bool:
+        return self.assunto == "produto"
 
 @dataclass
 class Mensagem:
@@ -62,40 +109,29 @@ class Mensagem:
     trechos: list[TrechoEncontrado] = field(default_factory=list)
     citacoes_invalidas: list[int] = field(default_factory=list)
     produto: Produto | None = None  # produto usado na resposta, se houve
+    consultas: list[Consulta] = field(default_factory=list)  # ferramentas que o agente usou
 
 
-def _tokens(texto: str) -> set[str]:
-    """Palavras minúsculas e sem acento, sem as palavras vazias ('de', 'o', 'meu'...)."""
-    sem_acento = unicodedata.normalize("NFD", texto.lower())
-    sem_acento = "".join(c for c in sem_acento if unicodedata.category(c) != "Mn")
-    return set(re.findall(r"[a-z0-9]+", sem_acento)) - _PALAVRAS_VAZIAS
-
-
-def localizar_produto(texto: str, produtos: list[Produto]) -> list[Produto]:
-    """Produtos cujo nome mais se parece com o texto, pelas palavras em comum.
-
-    Devolve vários se houver empate no topo (ambíguo) e lista vazia se nenhuma palavra bater.
-    Casamento por palavras, e não por significado, porque 'Moto G60' não é reconhecido como
-    'celular' pelo modelo de embeddings."""
-    palavras = _tokens(texto)
-    pontuados = [(len(palavras & _tokens(p.nome)), p) for p in produtos]
-    melhor = max((n for n, _ in pontuados), default=0)
-    if melhor == 0:
-        return []
-    return [p for n, p in pontuados if n == melhor]
+def _normalizar(texto: str) -> str:
+    """Minúsculas e sem acento ('Número' -> 'numero')."""
+    decomposto = unicodedata.normalize("NFD", texto.lower())
+    return "".join(c for c in decomposto if unicodedata.category(c) != "Mn")
 
 
 class Conversa:
-    def __init__(self, repositorio, base: BaseConhecimento, llm):
+    def __init__(self, repositorio, base: BaseConhecimento, llm, hoje: date | None = None):
         self.repositorio = repositorio
         self.base = base
         self.llm = llm
+        self.hoje = hoje  # None = data de hoje; a avaliação fixa uma data para repetir os resultados
         self.pergunta_pendente: str | None = None  # aguardando o usuário dizer o produto
         self.produto_atual: Produto | None = None  # assunto da conversa
+        self.opcoes_pendentes: list[Produto] = []  # as opções numeradas da última pergunta
 
     def reiniciar(self) -> None:
         self.pergunta_pendente = None
         self.produto_atual = None
+        self.opcoes_pendentes = []
 
     # ---------- entrada ----------
 
@@ -110,14 +146,36 @@ class Conversa:
             # a mensagem era uma pergunta nova: segue o fluxo normal
 
         analise = self.llm.estruturar(self._prompt_analise(mensagem), Analise, sistema=SISTEMA_ANALISE)
+        # "cadastro" e "produto" são exclusivos: "o que a garantia desse produto cobre?" é de termo
+        # e lei, e o agente só conhece o cadastro (quando eram dois sim/não, inventava a cobertura).
+        if analise.sobre_cadastro:
+            return self._responder_cadastro(mensagem)
         if not analise.precisa_produto:
-            return self._responder(mensagem, so_gerais=True)
+            resposta = self._responder(mensagem, so_gerais=True)
+            if produtos and resposta.texto.startswith(NAO_ENCONTREI):
+                # Rede de segurança: o classificador local erra, e a pergunta pode ser sobre um
+                # produto ("o que a garantia do celular cobria?"). O CDC não respondeu, então
+                # tentamos com o produto da conversa ou perguntamos qual é.
+                if self.produto_atual is not None:
+                    return self._responder_sobre(mensagem, self.produto_atual)
+                return self._perguntar_produto(
+                    mensagem, produtos, [],
+                    intro="Não achei isso nas leis. A pergunta é sobre algum dos seus produtos? Qual?",
+                )  # fmt: skip
+            return resposta
 
         produto = self.produto_atual
         if analise.produto_citado.strip():
-            candidatos = self._candidatos(analise.produto_citado, produtos)
+            # Com um produto já em discussão, só vale casar pelo nome: a busca por significado
+            # trocava o assunto em silêncio ("desse produto" virava o iPhone; caso ctx-02).
+            if produto is not None:
+                candidatos = localizar_produto(analise.produto_citado, produtos)
+            else:
+                candidatos = self._candidatos(analise.produto_citado, produtos)
             if len(candidatos) == 1:
                 produto = self.produto_atual = candidatos[0]
+            elif not candidatos and produto is not None:
+                pass  # "dessa lente": nada bate com o nome, então segue no produto da conversa
             else:
                 return self._perguntar_produto(mensagem, produtos, candidatos)
 
@@ -141,10 +199,26 @@ class Conversa:
             f"seguimento, como 'e o prazo?', são sobre ele.)\nMensagem: {mensagem}"
         )
 
+    def _responder_cadastro(self, pergunta: str) -> Mensagem:
+        """Pergunta sobre os produtos cadastrados: o agente consulta o banco com ferramentas."""
+        resposta = executar_agente(
+            self.llm,
+            pergunta,
+            criar_ferramentas(self.repositorio, self.hoje),
+            sistema_agente(self.hoje),
+        )
+        # Se a resposta fala de um produto só, ele vira o assunto: "e o que a garantia dessa
+        # lente cobre?" na pergunta seguinte já sabe de qual produto se trata.
+        citados = [p for p in self.repositorio.listar() if p.nome.lower() in resposta.texto.lower()]
+        if len(citados) == 1:
+            self.produto_atual = citados[0]
+        return Mensagem(texto=resposta.texto, consultas=resposta.consultas)
+
     def _resolver_produto_pendente(self, mensagem: str, produtos: list[Produto]) -> Mensagem | None:
         """Trata a mensagem como resposta a 'de qual produto?'. Devolve None se for uma
         pergunta nova (tem '?' e não identifica nenhum produto)."""
-        candidatos = self._candidatos(mensagem, produtos)
+        escolhido = self._escolha_por_posicao(mensagem)
+        candidatos = [escolhido] if escolhido else self._candidatos(mensagem, produtos)
 
         if len(candidatos) == 1:
             pergunta, self.pergunta_pendente = self.pergunta_pendente, None
@@ -155,7 +229,10 @@ class Conversa:
             self.pergunta_pendente = None
             return None
 
-        return self._perguntar_produto(self.pergunta_pendente, produtos, candidatos)
+        intro = None
+        if not candidatos:
+            intro = "Não entendi qual produto. Responda com o nome ou com o número:"
+        return self._perguntar_produto(self.pergunta_pendente, produtos, candidatos, intro=intro)
 
     def _candidatos(self, texto: str, produtos: list[Produto]) -> list[Produto]:
         """Primeiro por palavras em comum; se nada bater, tenta por significado."""
@@ -171,26 +248,54 @@ class Conversa:
         return [produto for produto, _ in semanticos]
 
     def _perguntar_produto(
-        self, pergunta: str, produtos: list[Produto], candidatos: list[Produto]
+        self,
+        pergunta: str,
+        produtos: list[Produto],
+        candidatos: list[Produto],
+        intro: str | None = None,
     ) -> Mensagem:
         self.pergunta_pendente = pergunta
         if len(candidatos) > 1:
-            opcoes = [p.nome for p in candidatos]
+            opcoes = candidatos
             intro = "Encontrei mais de um produto parecido. Qual deles?"
         else:
-            opcoes = [p.nome for p in produtos]
-            intro = "De qual produto você está falando?"
-        lista = "\n".join(f"- {nome}" for nome in opcoes)
+            opcoes = produtos
+            intro = intro or "De qual produto você está falando?"
+        self.opcoes_pendentes = list(opcoes)
+        # Numeradas: dá para responder "2" ou "o primeiro", sem depender de o nome bater.
+        lista = "\n".join(f"{i}. {p.nome}" for i, p in enumerate(opcoes, 1))
         return Mensagem(f"{intro}\n\n{lista}")
 
+    def _escolha_por_posicao(self, mensagem: str) -> Produto | None:
+        """'2', 'o 2', 'número 2', 'o primeiro', 'a segunda' -> a opção correspondente."""
+        texto = _normalizar(mensagem).strip(" .!")
+        achado = _RESPOSTA_POSICAO.match(texto)
+        if not achado:
+            return None
+        posicao = int(achado.group("n")) if achado.group("n") else _ORDINAIS[achado.group("ord")]
+        if 1 <= posicao <= len(self.opcoes_pendentes):
+            return self.opcoes_pendentes[posicao - 1]
+        return None
+
     def _responder_sobre(self, pergunta: str, produto: Produto) -> Mensagem:
-        aviso = ""
         if not self.base.tem_documentos(produto.id):
-            aviso = (
-                f"'{produto.nome}' ainda não tem termo de garantia ou manual cadastrado, "
-                "então respondi só com o CDC.\n\n"
-            )
-        return self._responder(pergunta, produto=produto, aviso=aviso)
+            return self._responder_sem_termo(pergunta, produto)
+        return self._responder(pergunta, produto=produto)
+
+    def _responder_sem_termo(self, pergunta: str, produto: Produto) -> Mensagem:
+        """Sem termo cadastrado: avisa e explica o que o CDC prevê (garantia legal)."""
+        trechos = self.base.buscar(CONSULTA_GARANTIA_LEGAL, so_gerais=True, k=2)
+        for trecho in self.base.buscar(pergunta, so_gerais=True, k=2):
+            if len(trechos) < TRECHOS_POR_RESPOSTA and all(t.texto != trecho.texto for t in trechos):
+                trechos.append(trecho)
+        resposta = self.base.responder_com_trechos(pergunta, self.llm, trechos, SISTEMA_SEM_TERMO)
+        aviso = f"Não há termo de garantia cadastrado para '{produto.nome}'. Pelo CDC:\n\n"
+        return Mensagem(
+            texto=aviso + resposta.texto,
+            trechos=resposta.trechos,
+            citacoes_invalidas=resposta.citacoes_invalidas,
+            produto=produto,
+        )
 
     def _responder(
         self,
@@ -199,13 +304,13 @@ class Conversa:
         so_gerais: bool = False,
         aviso: str = "",
     ) -> Mensagem:
-        resposta = self.base.responder(
-            pergunta,
-            self.llm,
-            produto_id=produto.id if produto else None,
-            k=TRECHOS_POR_RESPOSTA,
-            so_gerais=so_gerais,
+        # Perguntas de seguimento ("e o prazo?") não dizem de que se trata: a busca leva o nome do
+        # produto junto, senão acha trechos do CDC em vez do termo dele (caso ctx-03 da avaliação).
+        consulta = f"{produto.nome}: {pergunta}" if produto else pergunta
+        trechos = self.base.buscar(
+            consulta, produto.id if produto else None, TRECHOS_POR_RESPOSTA, so_gerais
         )
+        resposta = self.base.responder_com_trechos(pergunta, self.llm, trechos)
         return Mensagem(
             texto=aviso + resposta.texto,
             trechos=resposta.trechos,

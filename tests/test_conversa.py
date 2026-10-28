@@ -24,6 +24,7 @@ class LlmFalso:
     def __init__(self, classificar):
         self.classificar = classificar
         self.prompts = []
+        self.sistemas = []
         self.analises = 0
 
     def estruturar(self, prompt, formato, sistema=None):
@@ -32,11 +33,12 @@ class LlmFalso:
 
     def perguntar(self, prompt, sistema=None, temperatura=None):
         self.prompts.append(prompt)
+        self.sistemas.append(sistema)
         return "Resposta [1]."
 
 
 def sempre(precisa: bool, citado: str = ""):
-    return lambda _mensagem: Analise(precisa_produto=precisa, produto_citado=citado)
+    return lambda _mensagem: Analise(assunto="produto" if precisa else "lei", produto_citado=citado)
 
 
 def novo(nome: str) -> Produto:
@@ -167,13 +169,13 @@ def test_resposta_que_nao_identifica_produto_pergunta_de_novo(ambiente):
 
     resposta = c.responder("sei lá")
 
-    assert "De qual produto" in resposta.texto
+    assert "Não entendi qual produto" in resposta.texto
     assert c.pergunta_pendente == "A garantia cobre tela quebrada?"
 
 
 def test_pergunta_nova_durante_o_esclarecimento_abandona_a_pendente(ambiente):
-    analises = iter([Analise(precisa_produto=True, produto_citado=""),
-                     Analise(precisa_produto=False, produto_citado="")])
+    analises = iter([Analise(assunto="produto", produto_citado=""),
+                     Analise(assunto="lei", produto_citado="")])
     c, llm = conversa(ambiente, lambda _m: next(analises))
     c.responder("A garantia cobre tela quebrada?")
 
@@ -189,7 +191,7 @@ def test_produto_sem_termo_avisa_que_usou_so_o_cdc(ambiente):
     resposta = c.responder("Quanto tempo de garantia?")
 
     assert resposta.produto.nome == "Geladeira Brastemp 375L"
-    assert "ainda não tem termo de garantia" in resposta.texto
+    assert "Não há termo de garantia cadastrado" in resposta.texto
     assert {t.fonte for t in resposta.trechos} == {"cdc.txt"}
 
 
@@ -216,3 +218,202 @@ def test_reiniciar_limpa_o_assunto(ambiente):
 
     assert c.produto_atual is None and c.pergunta_pendente is None
     assert "De qual produto" in c.responder("A garantia cobre tela quebrada?").texto
+
+
+# ---------- pergunta sobre o cadastro (agente) ----------
+
+
+def test_pergunta_sobre_o_cadastro_vai_para_o_agente(ambiente):
+    from garantiafacil.agente import Chamada, PassoLlm
+
+    repo, base, *_ = ambiente
+    llm = LlmFalso(lambda _m: Analise(assunto="cadastro", produto_citado=""))
+    passos = iter(
+        [
+            PassoLlm("", [Chamada("1", "listar_produtos", {"status": "em_garantia"})]),
+            PassoLlm("Você tem 2 produtos na garantia.", []),
+        ]
+    )
+    llm.passo = lambda mensagens, ferramentas, sistema=None: next(passos)
+    c = Conversa(repo, base, llm)
+
+    resposta = c.responder("Quais produtos meus ainda estão na garantia?")
+
+    assert resposta.texto == "Você tem 2 produtos na garantia."
+    assert [q.nome for q in resposta.consultas] == ["listar_produtos"]
+    assert '"total"' in resposta.consultas[0].resultado
+    assert llm.prompts == []  # não passou pelo RAG
+    assert c.pergunta_pendente is None
+
+
+# ---------- produto sem termo: garantia legal do CDC ----------
+
+
+def test_produto_sem_termo_explica_a_garantia_legal_do_cdc(ambiente):
+    from garantiafacil.conversa import SISTEMA_SEM_TERMO
+
+    c, llm = conversa(ambiente, sempre(True, "geladeira brastemp"))
+
+    resposta = c.responder("O que a garantia cobre?")
+
+    assert resposta.texto.startswith("Não há termo de garantia cadastrado para 'Geladeira Brastemp 375L'")
+    assert llm.sistemas == [SISTEMA_SEM_TERMO]  # prompt próprio: explicar o que a lei prevê
+    assert {t.fonte for t in resposta.trechos} == {"cdc.txt"}
+
+
+def test_resposta_do_agente_sobre_um_produto_vira_o_assunto_da_conversa(ambiente):
+    from garantiafacil.agente import PassoLlm
+
+    repo, base, *_ = ambiente
+    llm = LlmFalso(lambda _m: Analise(assunto="cadastro", produto_citado=""))
+    llm.passo = lambda mensagens, ferramentas, sistema=None: PassoLlm(
+        "Só a Geladeira Brastemp 375L está na garantia.", []
+    )
+    c = Conversa(repo, base, llm)
+
+    c.responder("Qual produto ainda tem garantia?")
+
+    assert c.produto_atual.nome == "Geladeira Brastemp 375L"
+
+
+def test_resposta_do_agente_com_varios_produtos_nao_define_o_assunto(ambiente):
+    from garantiafacil.agente import PassoLlm
+
+    repo, base, *_ = ambiente
+    llm = LlmFalso(lambda _m: Analise(assunto="cadastro", produto_citado=""))
+    llm.passo = lambda mensagens, ferramentas, sistema=None: PassoLlm(
+        "Você tem a Geladeira Brastemp 375L e o MOTO G60 128GB - AZUL.", []
+    )
+    c = Conversa(repo, base, llm)
+
+    c.responder("Quais produtos eu tenho?")
+
+    assert c.produto_atual is None
+
+
+def test_referencia_que_nao_bate_com_nome_segue_no_produto_da_conversa(ambiente):
+    c, llm = conversa(ambiente, sempre(True, "esse aparelho"))
+    c.produto_atual = ambiente[2]  # o Moto G60 já é o assunto
+
+    resposta = c.responder("e o que a garantia desse aparelho cobre?")
+
+    assert resposta.produto.nome == "MOTO G60 128GB - AZUL"
+    assert "De qual produto" not in resposta.texto
+
+
+# ---------- rede de segurança: pergunta "geral" que na verdade era sobre um produto ----------
+
+
+def test_pergunta_geral_sem_resposta_no_cdc_pergunta_se_e_de_um_produto(ambiente):
+    from garantiafacil.rag import NAO_ENCONTREI
+
+    c, llm = conversa(ambiente, sempre(False))
+    respostas = iter([NAO_ENCONTREI, "Resposta [1]."])
+    llm.perguntar = lambda prompt, sistema=None, temperatura=None: next(respostas)
+
+    pergunta = c.responder("o que a garantia do celular cobria?")
+
+    assert "Não achei isso nas leis" in pergunta.texto and "MOTO G60 128GB - AZUL" in pergunta.texto
+    assert c.pergunta_pendente == "o que a garantia do celular cobria?"
+
+    resposta = c.responder("o moto g60")
+
+    assert resposta.produto.nome == "MOTO G60 128GB - AZUL"
+
+
+def test_pergunta_geral_sem_resposta_usa_o_produto_da_conversa_se_houver(ambiente):
+    from garantiafacil.rag import NAO_ENCONTREI
+
+    c, llm = conversa(ambiente, sempre(False))
+    c.produto_atual = ambiente[2]
+    respostas = iter([NAO_ENCONTREI, "Resposta [1]."])
+    llm.perguntar = lambda prompt, sistema=None, temperatura=None: next(respostas)
+
+    resposta = c.responder("o que a garantia cobria?")
+
+    assert resposta.produto.nome == "MOTO G60 128GB - AZUL"
+    assert c.pergunta_pendente is None
+
+
+def test_cadastro_e_produto_ao_mesmo_tempo_vai_para_os_documentos_e_nao_para_o_agente(ambiente):
+    repo, base, *_ = ambiente
+    llm = LlmFalso(
+        lambda _m: Analise(assunto="produto", produto_citado="geladeira brastemp")
+    )
+    llm.passo = lambda *a, **k: pytest.fail("não devia chamar o agente")
+    c = Conversa(repo, base, llm)
+
+    resposta = c.responder("o que a garantia desse produto cobre?")
+
+    assert resposta.texto.startswith("Não há termo de garantia cadastrado")
+    assert resposta.consultas == []
+
+
+# ---------- escolher o produto pelo número ----------
+
+
+def test_opcoes_vem_numeradas(ambiente):
+    c, _ = conversa(ambiente, sempre(True))
+
+    pergunta = c.responder("A garantia cobre tela quebrada?")
+
+    for i, produto in enumerate(c.opcoes_pendentes, 1):
+        assert f"{i}. {produto.nome}" in pergunta.texto
+
+
+def test_responder_com_o_numero_escolhe_a_opcao(ambiente):
+    c, _ = conversa(ambiente, sempre(True))
+    c.responder("A garantia cobre tela quebrada?")
+    segundo = c.opcoes_pendentes[1]
+
+    resposta = c.responder("2")
+
+    assert resposta.produto.nome == segundo.nome and c.pergunta_pendente is None
+
+
+@pytest.mark.parametrize("fala", ["o 1", "número 1", "o primeiro", "a primeira", "1."])
+def test_formas_de_dizer_a_posicao(ambiente, fala):
+    c, _ = conversa(ambiente, sempre(True))
+    c.responder("A garantia cobre tela quebrada?")
+    primeiro = c.opcoes_pendentes[0]
+
+    assert c.responder(fala).produto.nome == primeiro.nome
+
+
+def test_numero_fora_das_opcoes_pergunta_de_novo_com_dica(ambiente):
+    c, _ = conversa(ambiente, sempre(True))
+    c.responder("A garantia cobre tela quebrada?")
+
+    resposta = c.responder("9")
+
+    assert "Responda com o nome ou com o número" in resposta.texto
+    assert c.pergunta_pendente == "A garantia cobre tela quebrada?"
+
+
+def test_numero_dentro_do_nome_do_produto_nao_vira_posicao(ambiente):
+    c, _ = conversa(ambiente, sempre(True))
+    c.responder("A garantia cobre tela quebrada?")
+
+    assert c.responder("moto g60").produto.nome == "MOTO G60 128GB - AZUL"  # o 60 não é a opção 60
+
+
+def test_referencia_vaga_nao_troca_o_produto_por_busca_de_significado(ambiente, monkeypatch):
+    repo, base, moto, geladeira = ambiente
+    # a busca por significado acharia a geladeira para "desse produto"...
+    monkeypatch.setattr(repo, "buscar_semantico", lambda *a, **k: [(geladeira, 0.9)])
+    c, _ = conversa(ambiente, sempre(True, "desse produto"))
+    c.produto_atual = moto  # ...mas o assunto da conversa é o Moto G60
+
+    resposta = c.responder("o que a garantia desse produto cobre?")
+
+    assert resposta.produto.nome == "MOTO G60 128GB - AZUL"
+
+
+def test_sem_produto_em_discussao_a_busca_por_significado_ainda_vale(ambiente, monkeypatch):
+    repo, base, moto, geladeira = ambiente
+    monkeypatch.setattr(repo, "buscar_semantico", lambda *a, **k: [(geladeira, 0.9)])
+    c, _ = conversa(ambiente, sempre(True, "eletrodoméstico"))
+
+    resposta = c.responder("o que a garantia do eletrodoméstico cobre?")
+
+    assert resposta.produto.nome == "Geladeira Brastemp 375L"

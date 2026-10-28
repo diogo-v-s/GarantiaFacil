@@ -1,0 +1,488 @@
+{
+  "modelo": "llama3.2:3b",
+  "data_simulada": "2026-10-28",
+  "nota": "24/29",
+  "resultados": [
+    {
+      "caso": "cad-01-todos",
+      "tipo": "cadastro",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "listar_produtos",
+          {}
+        ]
+      ],
+      "texto": "Você tem os seguintes produtos:\n\n- Notebook Dell Inspiron 15 (garantia até 01/10/2027)\n- Geladeira Brastemp 375L (garantia até 10/03/2027)\n- Smart TV Samsung 50 (garantia até 15/12/2026)\n- Furadeira Bosch (garantia até 20/11/2026)\n- iPhone 15 (garantia vencida)",
+      "segundos": 25.678186500001175,
+      "opcional": false,
+      "produto": null
+    },
+    {
+      "caso": "cad-02-em-garantia",
+      "tipo": "cadastro",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "listar_produtos",
+          {
+            "status": "em_garantia"
+          }
+        ]
+      ],
+      "texto": "Aqui estão os produtos que ainda estão na garantia:\n\n- Notebook Dell Inspiron 15 (garantia até 01/10/2027)\n- Geladeira Brastemp 375L (garantia até 10/03/2027)\n- Smart TV Samsung 50 (garantia até 15/12/2026)\n- Furadeira Bosch (garantia até 20/11/2026)",
+      "segundos": 35.389193799997884,
+      "opcional": false,
+      "produto": null
+    },
+    {
+      "caso": "cad-03-vencidos",
+      "tipo": "cadastro",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "listar_produtos",
+          {
+            "status": "vencida"
+          }
+        ]
+      ],
+      "texto": "Você tem 1 produto cuja garantia já venceu:\n\n* iPhone 15: 22/03/2026",
+      "segundos": 15.566619799999899,
+      "opcional": false,
+      "produto": "iPhone 15"
+    },
+    {
+      "caso": "cad-04-vence-60",
+      "tipo": "cadastro",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "vencimentos_proximos",
+          {
+            "dias": 60
+          }
+        ]
+      ],
+      "texto": "Você tem 2 produtos que vencerão nos próximos 60 dias:\n\n- Furadeira Bosch (faltam 23 dias para vencer)\n- Smart TV Samsung 50 (faltam 48 dias para vencer)",
+      "segundos": 23.5322081000013,
+      "opcional": false,
+      "produto": null
+    },
+    {
+      "caso": "cad-05-vence-30",
+      "tipo": "cadastro",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "vencimentos_proximos",
+          {
+            "dias": 30
+          }
+        ]
+      ],
+      "texto": "Você tem uma furadeira Bosch que vence em breve, com a garantia terminando em 20/11/2026, em apenas 23 dias.",
+      "segundos": 15.810322299999825,
+      "opcional": false,
+      "produto": "Furadeira Bosch"
+    },
+    {
+      "caso": "cad-06-data-geladeira",
+      "tipo": "cadastro",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "detalhes_produto",
+          {
+            "nome": "geladeira"
+          }
+        ]
+      ],
+      "texto": "A garantia da geladeira Brastemp 375L vence em 10/03/2027.",
+      "segundos": 18.324448800001846,
+      "opcional": false,
+      "produto": "Geladeira Brastemp 375L"
+    },
+    {
+      "caso": "cad-07-valor-iphone",
+      "tipo": "cadastro",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "detalhes_produto",
+          {
+            "nome": "iPhone"
+          }
+        ]
+      ],
+      "texto": "Você pagou R$ 7299,00 no iPhone 15, composto na loja Apple Store, em 22/03/2025. A garantia estava vigente até 22/03/2026, mas já venceu.",
+      "segundos": 17.932999000000564,
+      "opcional": false,
+      "produto": "iPhone 15"
+    },
+    {
+      "caso": "cad-08-eletronicos",
+      "tipo": "cadastro",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "listar_produtos",
+          {
+            "categoria": "Eletrônicos"
+          }
+        ]
+      ],
+      "texto": "Você tem os seguintes eletrônicos em garantia:\n\n- Notebook Dell Inspiron 15: 01/10/2027\n- Smart TV Samsung 50: 15/12/2026\n- iPhone 15: não está em garantia",
+      "segundos": 24.375277100003586,
+      "opcional": false,
+      "produto": null
+    },
+    {
+      "caso": "cad-09-ferramentas",
+      "tipo": "cadastro",
+      "passou": false,
+      "falhas": [
+        "argumentos: esperava {'categoria': 'Ferramentas'}, usou [{}]"
+      ],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "listar_produtos",
+          {}
+        ]
+      ],
+      "texto": "Você tem 4 produtos cadastrados. Aqui estão os detalhes deles:\n\n- Notebook Dell Inspiron 15: 01/10/2027\n- Geladeira Brastemp 375L: 10/03/2027\n- Smart TV Samsung 50: 15/12/2026\n- Furadeira Bosch: 20/11/2026",
+      "segundos": 19.584453000003123,
+      "opcional": false,
+      "produto": null
+    },
+    {
+      "caso": "cad-10-data-compra",
+      "tipo": "cadastro",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "detalhes_produto",
+          {
+            "nome": "furadeira"
+          }
+        ]
+      ],
+      "texto": "Você comprou a Furadeira Bosch da Leroy Merlin, em 20/11/2025. A garantia vence em 20/11/2026, em 23 dias.",
+      "segundos": 18.167992599999707,
+      "opcional": false,
+      "produto": "Furadeira Bosch"
+    },
+    {
+      "caso": "cad-11-primeiro-a-vencer",
+      "tipo": "cadastro",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "vencimentos_proximos",
+          {
+            "dias": 30
+          }
+        ]
+      ],
+      "texto": "A garantia da Furadeira Bosch vence em breve, com 23 dias para vencer.",
+      "segundos": 15.839128200001142,
+      "opcional": false,
+      "produto": "Furadeira Bosch"
+    },
+    {
+      "caso": "lei-01-reclamar",
+      "tipo": "lei",
+      "passou": true,
+      "falhas": [],
+      "rota": "cdc",
+      "ferramentas": [],
+      "texto": "De acordo com o trecho [1], § 1°, o prazo decadencial para reclamar de um defeito é de trinta dias para fornecimentos de serviço e de produtos não duráveis, e de noventa dias para fornecimentos de serviço e de produtos duráveis. Além disso, o trecho [2] também menciona o mesmo prazo, e o trecho [1], § 2°, menciona que a reclamação comprovadamente formulada pelo consumidor até a resposta negativa correspondente pode obstar a decadência.",
+      "segundos": 31.980124600002455,
+      "opcional": false,
+      "produto": null
+    },
+    {
+      "caso": "lei-02-desistir",
+      "tipo": "lei",
+      "passou": true,
+      "falhas": [],
+      "rota": "cdc",
+      "ferramentas": [],
+      "texto": "Sim, você pode desistir da compra feita pela internet, desde que a contratação ocorra fora do estabelecimento comercial, especialmente por telefone ou a domicílio. Você tem o direito de exercitar o direito de arrependimento nos 7 dias a contar de sua assinatura ou do ato de recebimento do produto ou serviço.",
+      "segundos": 16.29967399999805,
+      "opcional": false,
+      "produto": null
+    },
+    {
+      "caso": "lei-03-prazo-duravel",
+      "tipo": "lei",
+      "passou": true,
+      "falhas": [],
+      "rota": "cdc",
+      "ferramentas": [],
+      "texto": "De acordo com o trecho [1], o prazo para reclamar de defeito em produto durável é de 90 dias.",
+      "segundos": 10.743542599997454,
+      "opcional": false,
+      "produto": null
+    },
+    {
+      "caso": "lei-04-trocar",
+      "tipo": "lei",
+      "passou": false,
+      "falhas": [
+        "rota: esperava cdc, foi esclarecimento",
+        "faltou qualquer um de: ['substitu', 'troca', 'conserto', 'reparo']"
+      ],
+      "rota": "esclarecimento",
+      "ferramentas": [],
+      "texto": "De qual produto você está falando?\n\n1. Notebook Dell Inspiron 15\n2. Geladeira Brastemp 375L\n3. Smart TV Samsung 50\n4. Furadeira Bosch\n5. iPhone 15",
+      "segundos": 4.341180200000963,
+      "opcional": false,
+      "produto": null
+    },
+    {
+      "caso": "lei-05-garantia-legal",
+      "tipo": "lei",
+      "passou": false,
+      "falhas": [
+        "rota: esperava cdc, foi esclarecimento"
+      ],
+      "rota": "esclarecimento",
+      "ferramentas": [],
+      "texto": "Não achei isso nas leis. A pergunta é sobre algum dos seus produtos? Qual?\n\n1. Notebook Dell Inspiron 15\n2. Geladeira Brastemp 375L\n3. Smart TV Samsung 50\n4. Furadeira Bosch\n5. iPhone 15",
+      "segundos": 6.192185299998528,
+      "opcional": false,
+      "produto": null
+    },
+    {
+      "caso": "termo-01-tela-quebrada",
+      "tipo": "termo",
+      "passou": true,
+      "falhas": [],
+      "rota": "documentos_produto",
+      "ferramentas": [],
+      "texto": "Não, a garantia não cobre tela quebrada ou trincada por impacto, de acordo com o trecho [3].",
+      "segundos": 21.246911100002762,
+      "opcional": false,
+      "produto": "Smart TV Samsung 50"
+    },
+    {
+      "caso": "termo-02-defeito-painel",
+      "tipo": "termo",
+      "passou": true,
+      "falhas": [],
+      "rota": "documentos_produto",
+      "ferramentas": [],
+      "texto": "Sim, de acordo com o trecho [1], a garantia da TV Samsung cobre defeitos de fabricação no painel.",
+      "segundos": 9.458388699997158,
+      "opcional": false,
+      "produto": "Smart TV Samsung 50"
+    },
+    {
+      "caso": "termo-03-prazo",
+      "tipo": "termo",
+      "passou": true,
+      "falhas": [],
+      "rota": "documentos_produto",
+      "ferramentas": [],
+      "texto": "De acordo com o trecho [1], a garantia da Smart TV Samsung 50 polegadas é de 12 meses, contados da data de emissão da nota fiscal de compra.",
+      "segundos": 22.66725089999818,
+      "opcional": false,
+      "produto": "Smart TV Samsung 50"
+    },
+    {
+      "caso": "termo-04-assistencia",
+      "tipo": "termo",
+      "passou": true,
+      "falhas": [],
+      "rota": "documentos_produto",
+      "ferramentas": [],
+      "texto": "Sim, de acordo com o trecho [1], a assistência técnica para reparo da TV precisa ser autorizada.",
+      "segundos": 32.39951479999945,
+      "opcional": false,
+      "produto": "Smart TV Samsung 50"
+    },
+    {
+      "caso": "sem-01-geladeira",
+      "tipo": "sem_termo",
+      "passou": true,
+      "falhas": [],
+      "rota": "sem_termo",
+      "ferramentas": [],
+      "texto": "Não há termo de garantia cadastrado para 'Geladeira Brastemp 375L'. Pelo CDC:\n\nDe acordo com o artigo 18, a garantia da geladeira cobre:\n\n- Vícios de qualidade ou quantidade que tornem o produto impróprio ou inadequado ao consumo;\n- Vícios decorrentes da disparidade das indicações constantes do recipiente, da embalagem, rotulagem ou mensagem publicitária;\n- A substituição das partes viciadas, desde que sanada no prazo máximo de trinta dias.\n\nO consumidor também tem a opção de exigir:\n\n- A substituição do produto por outro da mesma espécie, em perfeitas condições de uso;\n- A restituição imediata da quantia paga, monetariamente atualizada;\n- O abatimento proporcional do preço.",
+      "segundos": 43.80223660000047,
+      "opcional": false,
+      "produto": "Geladeira Brastemp 375L"
+    },
+    {
+      "caso": "sem-02-notebook",
+      "tipo": "sem_termo",
+      "passou": true,
+      "falhas": [],
+      "rota": "sem_termo",
+      "ferramentas": [],
+      "texto": "Não há termo de garantia cadastrado para 'Notebook Dell Inspiron 15'. Pelo CDC:\n\nDe acordo com o artigo 18 da Seção III da Lei do Consumidor, o fornecedor de produtos de consumo responde solidariamente pelos vícios de qualidade ou quantidade que os tornem impróprios ou inadequados ao consumo. O consumidor pode exigir a substituição das partes viciadas, alternativamente e à sua escolha, entre a substituição do produto por outro da mesma espécie em perfeitas condições de uso, a restituição imediata da quantia paga, monetariamente atualizada, sem prejuízo de eventuais perdas e danos, ou o abatimento proporcional do preço.\n\nNo entanto, não há um trecho específico que mencione a cobertura da garantia de bateria em produtos de consumo. No entanto, o artigo 50 estabelece que a garantia contratual é complementar à legal e deve ser padronizada e esclarecer a forma, o prazo e o lugar em que pode ser exercitada. Além disso, o artigo 51 proíbe cláusulas contratuais que impossibilitem, exonerem ou",
+      "segundos": 63.07675349999772,
+      "opcional": false,
+      "produto": "Notebook Dell Inspiron 15"
+    },
+    {
+      "caso": "sem-03-furadeira",
+      "tipo": "sem_termo",
+      "passou": true,
+      "falhas": [],
+      "rota": "sem_termo",
+      "ferramentas": [],
+      "texto": "Não há termo de garantia cadastrado para 'Furadeira Bosch'. Pelo CDC:\n\nDe acordo com o artigo 18 da Seção III da Lei do Consumidor, o consumidor tem direito a substituição do produto viciado ou à restituição imediata da quantia paga, alternativamente. Além disso, o consumidor também pode exigir o abatimento proporcional do preço. Não há menção explícita a garantia de substituição ou restituição imediata em relação à garantia da furadeira, mas o consumidor tem direito a escolher entre essas alternativas.",
+      "segundos": 25.859391300000425,
+      "opcional": false,
+      "produto": "Furadeira Bosch"
+    },
+    {
+      "caso": "esc-01-sem-produto",
+      "tipo": "esclarecimento",
+      "passou": true,
+      "falhas": [],
+      "rota": "esclarecimento",
+      "ferramentas": [],
+      "texto": "De qual produto você está falando?\n\n1. Notebook Dell Inspiron 15\n2. Geladeira Brastemp 375L\n3. Smart TV Samsung 50\n4. Furadeira Bosch\n5. iPhone 15",
+      "segundos": 4.487611600001401,
+      "opcional": false,
+      "produto": null
+    },
+    {
+      "caso": "esc-02-celular",
+      "tipo": "esclarecimento",
+      "passou": true,
+      "falhas": [],
+      "rota": "esclarecimento",
+      "ferramentas": [],
+      "texto": "De qual produto você está falando?\n\n1. Notebook Dell Inspiron 15\n2. Geladeira Brastemp 375L\n3. Smart TV Samsung 50\n4. Furadeira Bosch\n5. iPhone 15",
+      "segundos": 4.324824700001045,
+      "opcional": false,
+      "produto": null
+    },
+    {
+      "caso": "ctx-01-responde-qual",
+      "tipo": "contexto",
+      "passou": true,
+      "falhas": [],
+      "rota": "documentos_produto",
+      "ferramentas": [],
+      "texto": "Não, de acordo com o trecho [3], a garantia não cobre tela quebrada ou trincada por impacto.",
+      "segundos": 28.037517199998547,
+      "opcional": false,
+      "produto": "Smart TV Samsung 50"
+    },
+    {
+      "caso": "ctx-02-desse-produto",
+      "tipo": "contexto",
+      "passou": false,
+      "falhas": [
+        "assunto: esperava 'Furadeira', ficou 'iPhone 15'"
+      ],
+      "rota": "sem_termo",
+      "ferramentas": [],
+      "texto": "Não há termo de garantia cadastrado para 'iPhone 15'. Pelo CDC:\n\nA garantia legal prevista no Código de Defesa do Consumidor cobre:\n\n* Vícios de qualidade ou quantidade que tornem o produto impróprio ou inadequado ao consumo;\n* Vícios decorrentes da disparidade das indicações constantes do recipiente, da embalagem, rotulagem ou mensagem publicitária;\n* A substituição das partes viciadas;\n* A restituição imediata da quantia paga, monetariamente atualizada, sem prejuízo de eventuais perdas e danos;\n* O abatimento proporcional do preço.\n\nAlém disso, a garantia também inclui a substituição do produto por outro da mesma espécie, em perfeitas condições de uso, sempre que o consumidor optar por isso.",
+      "segundos": 62.537367600001744,
+      "opcional": false,
+      "produto": "iPhone 15"
+    },
+    {
+      "caso": "ctx-03-e-o-prazo",
+      "tipo": "contexto",
+      "passou": false,
+      "falhas": [
+        "faltou qualquer um de: ['12', 'doze', '15/12/2026']"
+      ],
+      "rota": "documentos_produto",
+      "ferramentas": [],
+      "texto": "Não encontrei essa informação nos documentos.",
+      "segundos": 53.17990270000155,
+      "opcional": false,
+      "produto": "Smart TV Samsung 50"
+    },
+    {
+      "caso": "ctx-04-e-os-vencidos",
+      "tipo": "contexto",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "listar_produtos",
+          {
+            "status": "vencida"
+          }
+        ]
+      ],
+      "texto": "Você tem um iPhone 15 que já venceu sua garantia, que termina em 22/03/2026.",
+      "segundos": 52.28540069999872,
+      "opcional": false,
+      "produto": "iPhone 15"
+    },
+    {
+      "caso": "opc-01-gasto-eletronicos",
+      "tipo": "opcional",
+      "passou": false,
+      "falhas": [
+        "ferramenta: esperava total_gasto, usou listar_produtos",
+        "faltou qualquer um de: ['14348', '14.348']"
+      ],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "listar_produtos",
+          {
+            "categoria": "Eletrodomésticos"
+          }
+        ]
+      ],
+      "texto": "Você gastou R$ 2.500,00 em eletrônicos, com um geladeira Brastemp 375L comprado em 10/03/2026, cuja garantia vence em 10/03/2027.",
+      "segundos": 22.607185600005323,
+      "opcional": true,
+      "produto": "Geladeira Brastemp 375L"
+    },
+    {
+      "caso": "opc-02-gasto-total",
+      "tipo": "opcional",
+      "passou": false,
+      "falhas": [
+        "ferramenta: esperava total_gasto, usou listar_produtos",
+        "faltou qualquer um de: ['18307', '18.307']"
+      ],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "listar_produtos",
+          {}
+        ]
+      ],
+      "texto": "Você gastou um total de R$ 5.000,00.",
+      "segundos": 28.6275730999987,
+      "opcional": true,
+      "produto": null
+    }
+  ]
+}

@@ -20,11 +20,12 @@
 
 ## Lacunas conhecidas do chat
 
-- **Perguntas sobre o próprio cadastro não funcionam.** "Qual produto tenho que ainda tem garantia
-  vigente?" é tratada como pergunta de produto e o chat pergunta "de qual produto?". O chat só
-  consulta textos (CDC e termos). Solução = etapa 6 (agente): ferramentas para listar produtos
-  por status, calcular vencimentos e buscar um produto; o modelo escolhe quando usá-las. A lógica
-  já existe em `garantia.py` (`status_garantia`, `contar_por_status`, `proximos_vencimentos`).
+- **Perguntas sobre o cadastro** ("qual produto tenho que ainda tem garantia vigente?") agora são
+  respondidas pelo agente (etapa 6, ver [avaliacao-agente.md](avaliacao-agente.md)). Limites do
+  modelo local: o título da resposta às vezes sai impreciso e a classificação depende de exemplos
+  no prompt. Reavaliar com o Claude.
+- O agente ainda não consulta os documentos (RAG) como ferramenta: o chat decide antes, pelo
+  classificador, se vai para o agente ou para o RAG.
 
 ## Etapas do roteiro ainda não feitas
 
@@ -32,3 +33,21 @@
 - 6. Agente de garantia
 - 7. Avaliação
 - 8. Extras
+
+## Ideia: XML da nota pela chave do QR code (Tecnospeed / PlugNotas)
+
+Pesquisado em 28/10/2026 (só documentação pública; nada testado).
+
+- O QR code da NFC-e traz a chave de acesso (44 dígitos) como primeiro parâmetro. O pipeline de
+  leitura de nota já extrai essa chave (QR ou texto impresso, validada pelo dígito verificador).
+- A API **PlugNotas** da Tecnospeed tem a rota "Download do XML Destinatário da NFC-e, por ID ou
+  chave" (GET, autenticada por chave de API no cabeçalho, com sandbox e produção). A Tecnospeed
+  também descreve o método `ConsultarNF` (consulta na SEFAZ pela chave e recupera o XML).
+- **Não confirmado:** se funciona para qualquer chave (nota de terceiro, venda sem CPF) ou só para
+  notas em que o CNPJ da conta é emitente ou destinatário; se exige certificado digital; preço e
+  limite gratuito. A documentação pública não responde isso.
+- Perguntas para o suporte da Tecnospeed: (1) baixa o XML de uma NFC-e qualquer, só com a chave?
+  (2) precisa de certificado ou de CNPJ vinculado? (3) existe plano gratuito ou de teste? (4)
+  funciona em todas as UFs?
+- Se funcionar: chave do QR -> XML -> dados exatos (loja, itens, valor, data), sem erro de IA.
+  Manter a leitura por IA como plano B. Não automatizar captcha de portal de SEFAZ.

@@ -12,6 +12,8 @@ import numpy as np
 from garantiafacil import embeddings
 from garantiafacil.documentos import dividir_em_trechos
 
+NAO_ENCONTREI = "Não encontrei essa informação nos documentos."
+
 # Lição medida: com "responda exatamente 'Não encontrei...' se não estiver nos trechos", o modelo
 # local (3B) recusava até perguntas cuja resposta estava no trecho. Um prompt mais brando, que só
 # manda recusar quando "nenhum trecho trata do assunto", respondeu certo.
@@ -19,7 +21,7 @@ SISTEMA = (
     "Você ajuda a consultar termos de garantia. Responda à pergunta com base nos trechos "
     "fornecidos, em português, de forma curta e direta, citando o número do trecho, como [1]. "
     "Cite apenas números de trechos que existem. "
-    "Só diga 'Não encontrei essa informação nos documentos.' se nenhum trecho tratar do assunto."
+    f"Só diga '{NAO_ENCONTREI}' se nenhum trecho tratar do assunto."
 )
 
 SEM_DOCUMENTOS = "Ainda não há documentos indexados. Adicione um manual ou termo de garantia."
@@ -171,10 +173,16 @@ class BaseConhecimento:
         so_gerais: bool = False,
     ) -> Resposta:
         trechos = self.buscar(pergunta, produto_id, k, so_gerais)
+        return self.responder_com_trechos(pergunta, llm, trechos)
+
+    def responder_com_trechos(
+        self, pergunta: str, llm, trechos: list[TrechoEncontrado], sistema: str = SISTEMA
+    ) -> Resposta:
+        """Responde com trechos já escolhidos (quem chama decide a busca)."""
         if not trechos:
             return Resposta(SEM_DOCUMENTOS, [])
 
         # Temperatura 0: queremos fidelidade aos trechos, não criatividade.
-        texto = llm.perguntar(montar_prompt(pergunta, trechos), sistema=SISTEMA, temperatura=0)
+        texto = llm.perguntar(montar_prompt(pergunta, trechos), sistema=sistema, temperatura=0)
         texto = texto.strip()
         return Resposta(texto, trechos, achar_citacoes_invalidas(texto, len(trechos)))

@@ -10,6 +10,8 @@ import os
 from dotenv import load_dotenv
 from pydantic import BaseModel
 
+from garantiafacil.agente import Chamada, PassoLlm
+
 load_dotenv()  # lê o arquivo .env para as variáveis de ambiente
 
 # Máximo de tokens por resposta no Ollama: na CPU cada token custa caro e as respostas devem
@@ -84,6 +86,52 @@ class OllamaLlm:
 
         resposta = ollama.chat(model=self.modelo, messages=mensagens, options=opcoes)
         return resposta.message.content
+
+    def passo(self, mensagens: list[dict], ferramentas: list, sistema: str | None = None) -> PassoLlm:
+        """Uma volta do agente: o modelo responde com texto ou pede ferramentas.
+
+        `mensagens` está no formato neutro de agente.py; aqui é traduzido para o do Ollama."""
+        import ollama
+
+        convertidas = [{"role": "system", "content": sistema}] if sistema else []
+        for m in mensagens:
+            if m["papel"] == "usuario":
+                convertidas.append({"role": "user", "content": m["texto"]})
+            elif m["papel"] == "assistente":
+                msg = {"role": "assistant", "content": m["texto"]}
+                if m["chamadas"]:
+                    msg["tool_calls"] = [
+                        {"function": {"name": c.nome, "arguments": c.argumentos}}
+                        for c in m["chamadas"]
+                    ]
+                convertidas.append(msg)
+            else:  # resultado de uma ferramenta
+                convertidas.append(
+                    {"role": "tool", "content": m["conteudo"], "tool_name": m["chamada"].nome}
+                )
+
+        resposta = ollama.chat(
+            model=self.modelo,
+            messages=convertidas,
+            tools=[
+                {
+                    "type": "function",
+                    "function": {
+                        "name": f.nome,
+                        "description": f.descricao,
+                        "parameters": f.schema(),
+                    },
+                }
+                for f in ferramentas
+            ],
+            options={"temperature": 0, "num_predict": LIMITE_RESPOSTA_OLLAMA},
+        )
+        chamadas = [
+            # o Ollama não dá id às chamadas; usamos a posição
+            Chamada(id=str(i), nome=c.function.name, argumentos=dict(c.function.arguments or {}))
+            for i, c in enumerate(resposta.message.tool_calls or [])
+        ]
+        return PassoLlm(resposta.message.content or "", chamadas)
 
 
 class ClaudeLlm:
@@ -185,6 +233,55 @@ class ClaudeLlm:
             **extras,
         )
         return resposta.content[0].text
+
+    def passo(self, mensagens: list[dict], ferramentas: list, sistema: str | None = None) -> PassoLlm:
+        """Uma volta do agente com o Claude (tool use).
+
+        Diferença para o Ollama: o Claude exige que cada resultado volte com o id da chamada
+        (`tool_use_id`) e dentro de uma mensagem do usuário."""
+        import anthropic
+
+        convertidas: list[dict] = []
+        for m in mensagens:
+            if m["papel"] == "usuario":
+                convertidas.append({"role": "user", "content": m["texto"]})
+            elif m["papel"] == "assistente":
+                blocos = [{"type": "text", "text": m["texto"]}] if m["texto"].strip() else []
+                blocos += [
+                    {"type": "tool_use", "id": c.id, "name": c.nome, "input": c.argumentos}
+                    for c in m["chamadas"]
+                ]
+                convertidas.append({"role": "assistant", "content": blocos})
+            else:
+                bloco = {
+                    "type": "tool_result",
+                    "tool_use_id": m["chamada"].id,
+                    "content": m["conteudo"],
+                }
+                anterior = convertidas[-1]
+                if anterior["role"] == "user" and isinstance(anterior["content"], list):
+                    anterior["content"].append(bloco)  # vários resultados, uma só mensagem
+                else:
+                    convertidas.append({"role": "user", "content": [bloco]})
+
+        resposta = anthropic.Anthropic().messages.create(
+            model=self.modelo,
+            max_tokens=1024,
+            system=sistema or "",
+            temperature=0,
+            tools=[
+                {"name": f.nome, "description": f.descricao, "input_schema": f.schema()}
+                for f in ferramentas
+            ],
+            messages=convertidas,
+        )
+        texto = "".join(b.text for b in resposta.content if b.type == "text")
+        chamadas = [
+            Chamada(id=b.id, nome=b.name, argumentos=dict(b.input))
+            for b in resposta.content
+            if b.type == "tool_use"
+        ]
+        return PassoLlm(texto, chamadas)
 
 
 def criar_llm():
