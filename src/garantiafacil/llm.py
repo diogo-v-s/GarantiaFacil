@@ -20,6 +20,25 @@ class OllamaLlm:
         self.modelo = modelo
         self.modelo_visao = modelo_visao or modelo  # modelos de texto puro não leem imagem
 
+    def estruturar(
+        self, prompt: str, formato: type[BaseModel], sistema: str | None = None
+    ) -> BaseModel:
+        """Como `extrair`, mas só com texto: devolve a resposta no formato (classe Pydantic) pedido."""
+        import ollama
+
+        mensagens = []
+        if sistema:
+            mensagens.append({"role": "system", "content": sistema})
+        mensagens.append({"role": "user", "content": prompt})
+
+        resposta = ollama.chat(
+            model=self.modelo,
+            messages=mensagens,
+            format=formato.model_json_schema(),
+            options={"temperature": 0},
+        )
+        return formato.model_validate_json(resposta.message.content)
+
     def extrair(
         self,
         prompt: str,
@@ -68,6 +87,31 @@ class ClaudeLlm:
 
     def __init__(self, modelo: str):
         self.modelo = modelo
+
+    def estruturar(
+        self, prompt: str, formato: type[BaseModel], sistema: str | None = None
+    ) -> BaseModel:
+        """Como `extrair`, mas só com texto."""
+        import anthropic
+
+        client = anthropic.Anthropic()
+        resposta = client.messages.create(
+            model=self.modelo,
+            max_tokens=1024,
+            system=sistema or "",
+            temperature=0,
+            tools=[
+                {
+                    "name": "registrar_dados",
+                    "description": "Registra a resposta no formato pedido.",
+                    "input_schema": formato.model_json_schema(),
+                }
+            ],
+            tool_choice={"type": "tool", "name": "registrar_dados"},
+            messages=[{"role": "user", "content": prompt}],
+        )
+        bloco = next(b for b in resposta.content if b.type == "tool_use")
+        return formato.model_validate(bloco.input)
 
     def extrair(
         self,

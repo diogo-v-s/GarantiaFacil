@@ -3,18 +3,26 @@
 Rode com: uv run streamlit run src/garantiafacil/app.py
 """
 
+import threading
 from datetime import date
 from pathlib import Path
 
 import streamlit as st
 
 from garantiafacil.db import conectar
+from garantiafacil.conversa import Conversa, Mensagem
+from garantiafacil.documentos import extrair_paginas
 from garantiafacil.garantia import data_vencimento, dias_restantes, status_garantia
+from garantiafacil.llm import criar_llm
 from garantiafacil.modelos import Produto
 from garantiafacil.pipeline_nota import ler_nota
+from garantiafacil.rag import BaseConhecimento
 from garantiafacil.repositorio import Repositorio
 
 EXTENSOES_IMAGEM = {".png", ".jpg", ".jpeg", ".webp"}
+
+CAMINHO_CDC = Path(__file__).resolve().parents[2] / "docs" / "conhecimento" / "cdc.txt"
+FONTE_CDC = CAMINHO_CDC.name
 
 ROTULO_STATUS = {
     "vigente": "🟢 Vigente",
@@ -111,7 +119,7 @@ def tela_cadastro(repo: Repositorio):
     st.rerun()
 
 
-def mostrar_produto(repo: Repositorio, produto: Produto):
+def mostrar_produto(repo: Repositorio, base: BaseConhecimento, produto: Produto):
     status = status_garantia(produto)
     dias = dias_restantes(produto)
     titulo = f"{ROTULO_STATUS[status]} · {produto.nome} ({produto.loja})"
@@ -142,12 +150,36 @@ def mostrar_produto(repo: Repositorio, produto: Produto):
                     key=f"download_{comprovante.id}",
                 )
 
+        st.markdown("**Termo de garantia ou manual** (usado nas respostas da aba Perguntas)")
+        for fonte, produto_id, total in base.listar_fontes():
+            if produto_id == produto.id:
+                st.caption(f"📄 {fonte} · {total} trechos")
+
+        termo = st.file_uploader(
+            "Adicionar termo ou manual (PDF ou texto)",
+            type=["pdf", "txt", "md"],
+            key=f"termo_{produto.id}",
+        )
+        if termo and st.button("Indexar documento", key=f"indexar_{produto.id}"):
+            paginas = extrair_paginas(termo.name, termo.getvalue())
+            if not paginas:
+                st.error(
+                    "Não encontrei texto neste arquivo. PDFs escaneados (só imagem) ainda não são lidos."
+                )
+            else:
+                try:
+                    with st.spinner("Indexando (gera um vetor por trecho)..."):
+                        total = base.indexar(termo.name, paginas, produto.id)
+                    st.success(f"'{termo.name}' indexado em {total} trechos.")
+                except Exception as erro:  # Ollama fora do ar, modelo não baixado...
+                    st.error(f"Não consegui indexar: {erro}")
+
         if st.button("Excluir produto", key=f"excluir_{produto.id}"):
             repo.excluir(produto.id)
             st.rerun()
 
 
-def tela_lista(repo: Repositorio):
+def tela_lista(repo: Repositorio, base: BaseConhecimento):
     st.subheader("Meus produtos")
     coluna_busca, coluna_tipo = st.columns([3, 2])
     texto = coluna_busca.text_input("Buscar", placeholder="Ex.: geladeira, celular, notebook")
@@ -178,7 +210,93 @@ def tela_lista(repo: Repositorio):
     for produto in produtos:
         if produto.id in similaridades:
             st.caption(f"Similaridade com a busca: {similaridades[produto.id]:.2f}")
-        mostrar_produto(repo, produto)
+        mostrar_produto(repo, base, produto)
+
+
+@st.cache_resource  # roda uma vez por servidor: a thread começa quando o app abre
+def iniciar_indexacao_cdc() -> dict:
+    """Indexa o CDC em segundo plano (na primeira vez, ou se o modelo de embeddings mudou),
+    para já estar pronto quando o usuário fizer a primeira pergunta.
+
+    A thread usa a própria conexão com o banco: uma conexão SQLite não deve ser compartilhada
+    entre a indexação e as telas ao mesmo tempo."""
+    estado: dict = {"erro": None}
+
+    def trabalho():
+        try:
+            base = BaseConhecimento(conectar())
+            if base.fonte_indexada(FONTE_CDC):
+                return
+            if not CAMINHO_CDC.exists():
+                raise FileNotFoundError(f"Arquivo do CDC não encontrado: {CAMINHO_CDC}")
+            base.indexar(FONTE_CDC, extrair_paginas(CAMINHO_CDC.name, CAMINHO_CDC.read_bytes()))
+        except Exception as erro:  # Ollama fora do ar, modelo de embeddings não baixado...
+            estado["erro"] = str(erro)
+
+    estado["thread"] = threading.Thread(target=trabalho, daemon=True)
+    estado["thread"].start()
+    return estado
+
+
+def mostrar_mensagem(papel: str, conteudo):
+    with st.chat_message(papel):
+        if papel == "user":
+            st.markdown(conteudo)
+            return
+
+        mensagem: Mensagem = conteudo
+        st.markdown(mensagem.texto)
+        if mensagem.produto:
+            st.caption(f"Produto considerado: {mensagem.produto.nome}")
+        if mensagem.citacoes_invalidas:
+            numeros = ", ".join(f"[{n}]" for n in mensagem.citacoes_invalidas)
+            st.warning(f"A IA citou {numeros}, que não existe(m) nos trechos. Confira nas fontes.")
+        if mensagem.trechos:
+            with st.expander(f"Trechos usados ({len(mensagem.trechos)})"):
+                for i, trecho in enumerate(mensagem.trechos, 1):
+                    st.markdown(
+                        f"**[{i}] {trecho.fonte}, página {trecho.pagina}** "
+                        f"· similaridade {trecho.similaridade:.2f}"
+                    )
+                    st.text(trecho.texto)
+
+
+def tela_perguntas(repo: Repositorio, base: BaseConhecimento, indexacao: dict):
+    st.subheader("Como posso ajudar?")
+    st.caption("Pergunte sobre suas garantias e seus direitos de consumidor.")
+
+    if "conversa" not in st.session_state:
+        st.session_state["conversa"] = Conversa(repo, base, criar_llm())
+        st.session_state["historico"] = []
+    conversa: Conversa = st.session_state["conversa"]
+    historico: list = st.session_state["historico"]
+
+    if historico and st.button("Novo assunto"):
+        conversa.reiniciar()
+        historico.clear()
+        st.rerun()
+
+    for papel, conteudo in historico:
+        mostrar_mensagem(papel, conteudo)
+
+    entrada = st.chat_input("Ex.: a garantia cobre tela quebrada?")
+    if not entrada:
+        return
+
+    historico.append(("user", entrada))
+    mostrar_mensagem("user", entrada)
+    try:
+        with st.spinner("Pensando..."):
+            indexacao["thread"].join()  # só espera se o CDC ainda estiver sendo indexado
+            if indexacao["erro"]:
+                raise RuntimeError(f"não consegui indexar o CDC: {indexacao['erro']}")
+            resposta = conversa.responder(entrada)
+    except Exception as erro:  # Ollama fora do ar, modelo não baixado...
+        st.error(f"Não consegui responder: {erro}")
+        return
+
+    historico.append(("assistant", resposta))
+    mostrar_mensagem("assistant", resposta)
 
 
 def main():
@@ -186,16 +304,20 @@ def main():
     st.title("🧾 GarantiaFácil")
 
     repo = obter_repositorio()
+    base = BaseConhecimento(repo.conexao)
+    indexacao = iniciar_indexacao_cdc()
 
     mensagem = st.session_state.pop("mensagem_sucesso", None)  # mostra uma vez só
     if mensagem:
         st.success(mensagem)
 
-    aba_lista, aba_cadastro = st.tabs(["Meus produtos", "Cadastrar"])
+    aba_lista, aba_cadastro, aba_perguntas = st.tabs(["Meus produtos", "Cadastrar", "Perguntas"])
     with aba_lista:
-        tela_lista(repo)
+        tela_lista(repo, base)
     with aba_cadastro:
         tela_cadastro(repo)
+    with aba_perguntas:
+        tela_perguntas(repo, base, indexacao)
 
 
 main()

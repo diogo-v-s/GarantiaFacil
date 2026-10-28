@@ -26,6 +26,18 @@ CREATE TABLE IF NOT EXISTS embeddings (
     vetor BLOB NOT NULL
 );
 
+-- Trechos de manuais e termos de garantia, para o RAG. produto_id NULL = documento geral
+-- (vale para qualquer produto, como o Código de Defesa do Consumidor).
+CREATE TABLE IF NOT EXISTS trechos (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    produto_id INTEGER REFERENCES produtos(id) ON DELETE CASCADE,
+    fonte TEXT NOT NULL,
+    pagina INTEGER NOT NULL,
+    texto TEXT NOT NULL,
+    modelo TEXT NOT NULL,
+    vetor BLOB NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS comprovantes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     produto_id INTEGER NOT NULL REFERENCES produtos(id) ON DELETE CASCADE,

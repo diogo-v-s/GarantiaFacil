@@ -8,6 +8,7 @@ dependencies = [
     "ollama",
     "opencv-python-headless",
     "pydantic",
+    "pypdf",
     "python-dotenv",
     "streamlit",
 ]
