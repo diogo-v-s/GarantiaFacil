@@ -1,0 +1,203 @@
+from datetime import date
+
+import numpy as np
+import pytest
+
+from garantiafacil.db import conectar
+from garantiafacil.modelos import Produto
+from garantiafacil.repositorio import Repositorio
+
+
+def embedding_falso(texto: str, consulta: bool = False) -> np.ndarray:
+    """Dublê do modelo de embeddings: agrupa por categoria, sem chamar o Ollama.
+    Geladeira e refrigerador compartilham o mesmo 'significado'."""
+    texto = texto.lower()
+    if "geladeira" in texto or "refrigerador" in texto:
+        return np.array([1, 0, 0], dtype=np.float32)
+    if "notebook" in texto:
+        return np.array([0, 1, 0], dtype=np.float32)
+    return np.array([0, 0, 1], dtype=np.float32)
+
+
+@pytest.fixture
+def repo(tmp_path):
+    """Repositório novo para cada teste: banco em memória e comprovantes numa pasta temporária."""
+    return Repositorio(
+        conectar(":memory:"),
+        pasta_comprovantes=tmp_path / "comprovantes",
+        gerar_embedding=embedding_falso,
+        nome_modelo=lambda: "falso",
+    )
+
+
+def novo_produto(nome="Geladeira Brastemp", loja="Magazine", observacoes="") -> Produto:
+    return Produto(
+        nome=nome,
+        loja=loja,
+        data_compra=date(2026, 3, 5),
+        prazo_garantia_meses=12,
+        valor=3499.90,
+        observacoes=observacoes,
+    )
+
+
+def test_adicionar_e_obter(repo):
+    salvo = repo.adicionar(novo_produto())
+    assert salvo.id is not None
+
+    lido = repo.obter(salvo.id)
+    assert lido == salvo
+
+
+def test_obter_inexistente_retorna_none(repo):
+    assert repo.obter(999) is None
+
+
+def test_listar_ordena_pela_compra_mais_recente(repo):
+    antigo = novo_produto("Antigo")
+    antigo.data_compra = date(2025, 1, 1)
+    repo.adicionar(antigo)
+    repo.adicionar(novo_produto("Novo"))
+
+    assert [p.nome for p in repo.listar()] == ["Novo", "Antigo"]
+
+
+def test_buscar_por_nome_loja_e_observacao(repo):
+    repo.adicionar(novo_produto("Geladeira", "Magazine"))
+    repo.adicionar(novo_produto("Notebook", "Kabum", observacoes="comprado para o trabalho"))
+
+    assert [p.nome for p in repo.buscar("gelad")] == ["Geladeira"]
+    assert [p.nome for p in repo.buscar("kabum")] == ["Notebook"]
+    assert [p.nome for p in repo.buscar("trabalho")] == ["Notebook"]
+    assert repo.buscar("televisão") == []
+
+
+def test_buscar_nao_acha_sinonimo(repo):
+    """Documenta a limitação do LIKE, que a busca semântica (etapa 4) vai resolver."""
+    repo.adicionar(novo_produto("Refrigerador"))
+    assert repo.buscar("geladeira") == []
+
+
+def test_comprovante_salva_arquivo_e_registro(repo):
+    produto = repo.adicionar(novo_produto())
+    comprovante = repo.adicionar_comprovante(produto.id, "nota.pdf", b"conteudo")
+
+    assert comprovante.nome_original == "nota.pdf"
+    assert repo.listar_comprovantes(produto.id) == [comprovante]
+    with open(comprovante.caminho, "rb") as arquivo:
+        assert arquivo.read() == b"conteudo"
+
+
+def test_comprovante_descarta_pasta_do_nome(repo):
+    produto = repo.adicionar(novo_produto())
+    comprovante = repo.adicionar_comprovante(produto.id, "../../fora/nota.pdf", b"x")
+    assert comprovante.nome_original == "nota.pdf"
+
+
+def test_excluir_remove_produto_comprovantes_e_arquivos(repo):
+    from pathlib import Path
+
+    produto = repo.adicionar(novo_produto())
+    comprovante = repo.adicionar_comprovante(produto.id, "nota.pdf", b"x")
+
+    repo.excluir(produto.id)
+
+    assert repo.obter(produto.id) is None
+    assert repo.listar_comprovantes(produto.id) == []
+    assert not Path(comprovante.caminho).exists()
+
+
+# ---------- busca por significado ----------
+
+
+def test_busca_semantica_acha_sinonimo(repo):
+    repo.adicionar(novo_produto("Refrigerador Brastemp"))
+    repo.adicionar(novo_produto("Notebook Dell"))
+
+    resultado = repo.buscar_semantico("geladeira")
+
+    assert [(p.nome, round(nota, 2)) for p, nota in resultado] == [("Refrigerador Brastemp", 1.0)]
+
+
+def test_busca_semantica_respeita_o_minimo(repo):
+    repo.adicionar(novo_produto("Notebook Dell"))
+
+    assert repo.buscar_semantico("geladeira", minimo=0.5) == []
+    assert len(repo.buscar_semantico("geladeira", minimo=0.0)) == 1
+
+
+def test_busca_semantica_respeita_o_limite_e_ordena(repo):
+    repo.adicionar(novo_produto("Geladeira A"))
+    repo.adicionar(novo_produto("Geladeira B"))
+    repo.adicionar(novo_produto("Geladeira C"))
+
+    assert len(repo.buscar_semantico("geladeira", limite=2)) == 2
+
+
+def test_busca_semantica_com_consulta_vazia(repo):
+    repo.adicionar(novo_produto("Geladeira"))
+    assert repo.buscar_semantico("   ") == []
+
+
+def test_produto_e_salvo_mesmo_se_o_embedding_falhar(tmp_path):
+    def quebrado(texto, consulta=False):
+        raise ConnectionError("Ollama fora do ar")
+
+    repo = Repositorio(
+        conectar(":memory:"),
+        pasta_comprovantes=tmp_path,
+        gerar_embedding=quebrado,
+        nome_modelo=lambda: "falso",
+    )
+
+    salvo = repo.adicionar(novo_produto("Geladeira"))
+
+    assert repo.obter(salvo.id) is not None
+    assert repo.conexao.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0] == 0
+
+
+def test_reindexar_completa_o_que_faltou(tmp_path):
+    ligado = {"ok": False}
+
+    def instavel(texto, consulta=False):
+        if not ligado["ok"]:
+            raise ConnectionError("Ollama fora do ar")
+        return embedding_falso(texto, consulta)
+
+    repo = Repositorio(
+        conectar(":memory:"),
+        pasta_comprovantes=tmp_path,
+        gerar_embedding=instavel,
+        nome_modelo=lambda: "falso",
+    )
+    repo.adicionar(novo_produto("Geladeira"))
+    assert repo.reindexar() == 0  # ainda fora do ar
+
+    ligado["ok"] = True
+    assert repo.reindexar() == 1
+    assert repo.reindexar() == 0  # nada mais a fazer
+    assert len(repo.buscar_semantico("refrigerador")) == 1
+
+
+def test_reindexar_refaz_quando_o_modelo_muda(tmp_path):
+    modelo = {"nome": "modelo-a"}
+    repo = Repositorio(
+        conectar(":memory:"),
+        pasta_comprovantes=tmp_path,
+        gerar_embedding=embedding_falso,
+        nome_modelo=lambda: modelo["nome"],
+    )
+    repo.adicionar(novo_produto("Geladeira"))
+    assert repo.buscar_semantico("geladeira", minimo=0.0) != []
+
+    modelo["nome"] = "modelo-b"
+    assert repo.buscar_semantico("geladeira", minimo=0.0) == []  # vetores do modelo antigo não servem
+    assert repo.reindexar() == 1
+    assert repo.buscar_semantico("geladeira", minimo=0.0) != []
+
+
+def test_excluir_remove_o_embedding(repo):
+    salvo = repo.adicionar(novo_produto("Geladeira"))
+    repo.excluir(salvo.id)
+
+    assert repo.conexao.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0] == 0

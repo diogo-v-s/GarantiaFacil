@@ -6,7 +6,10 @@ requires-python = ">=3.12"
 dependencies = [
     "anthropic",
     "ollama",
+    "opencv-python-headless",
+    "pydantic",
     "python-dotenv",
+    "streamlit",
 ]
 
 [dependency-groups]

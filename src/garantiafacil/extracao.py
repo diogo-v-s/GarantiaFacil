@@ -1,0 +1,67 @@
+"""Extração de dados de uma foto de nota fiscal usando um LLM com visão."""
+
+from datetime import date, datetime
+
+from pydantic import BaseModel, Field
+
+from garantiafacil.chave_acesso import buscar_chave
+from garantiafacil.llm import criar_llm
+
+# Atenção: campos opcionais (`str | None`) e a instrução "use null se não souber" faziam o modelo
+# local devolver null em quase tudo. Campos obrigatórios e instruções positivas funcionaram bem.
+# O usuário sempre confere os dados no formulário, então um campo errado é corrigível.
+SISTEMA = (
+    "Você lê fotos de notas fiscais e cupons brasileiros e extrai os dados com precisão, "
+    "copiando o texto como está escrito no documento."
+)
+
+PROMPT = "Extraia os dados desta nota fiscal."
+
+
+class DadosNota(BaseModel):
+    """Formato que o LLM é obrigado a seguir. As descrições orientam o modelo."""
+
+    loja: str = Field(description="Nome da empresa que emitiu o documento (razão social do emitente)")
+    produto: str = Field(
+        description="Descrição do item vendido (se houver vários itens, o de maior valor)"
+    )
+    data_compra: str = Field(description="Data de emissão, como aparece no documento")
+    valor: float = Field(description="Valor total da nota em reais, com ponto como decimal")
+
+    def data(self) -> date | None:
+        """Converte o texto da data para `date`; None se o modelo devolveu algo inválido.
+
+        Aceita AAAA-MM-DD e DD/MM/AAAA (o formato usado nas notas brasileiras)."""
+        texto = self.data_compra.strip()
+        for formato in ("%d/%m/%Y", "%Y-%m-%d"):
+            try:
+                return datetime.strptime(texto, formato).date()
+            except ValueError:
+                continue
+        return None
+
+
+class ChaveLida(BaseModel):
+    chave: str = Field(
+        description="Os 44 dígitos do campo CHAVE DE ACESSO, na ordem em que aparecem, sem espaços"
+    )
+
+
+def ler_chave_impressa(imagem: bytes, tipo_midia: str = "image/jpeg", llm=None) -> str | None:
+    """Pede à IA para ler a chave de acesso impressa. Pode errar dígitos: quem chama deve
+    validar com `chave_acesso.interpretar`, que confere o dígito verificador."""
+    llm = llm or criar_llm()
+    lida = llm.extrair(
+        "Leia a chave de acesso (44 dígitos) desta nota fiscal.",
+        imagem,
+        ChaveLida,
+        sistema=SISTEMA,
+        tipo_midia=tipo_midia,
+    )
+    return buscar_chave(lida.chave)
+
+
+def extrair_dados_nota(imagem: bytes, tipo_midia: str = "image/jpeg", llm=None) -> DadosNota:
+    """Recebe os bytes da imagem e devolve os dados lidos. `llm` pode ser injetado nos testes."""
+    llm = llm or criar_llm()
+    return llm.extrair(PROMPT, imagem, DadosNota, sistema=SISTEMA, tipo_midia=tipo_midia)
