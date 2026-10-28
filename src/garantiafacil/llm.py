@@ -12,6 +12,10 @@ from pydantic import BaseModel
 
 load_dotenv()  # lê o arquivo .env para as variáveis de ambiente
 
+# Máximo de tokens por resposta no Ollama: na CPU cada token custa caro e as respostas devem
+# ser curtas. Remover o limite (ou subir) quando o chat passar para o Claude.
+LIMITE_RESPOSTA_OLLAMA = 250
+
 
 class OllamaLlm:
     """Modelo rodando local, via Ollama."""
@@ -74,7 +78,7 @@ class OllamaLlm:
         mensagens.append({"role": "user", "content": prompt})
 
         # No Ollama, parâmetros de geração vão dentro de "options"
-        opcoes = {}
+        opcoes = {"num_predict": LIMITE_RESPOSTA_OLLAMA}
         if temperatura is not None:
             opcoes["temperature"] = temperatura
 

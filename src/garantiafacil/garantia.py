@@ -38,6 +38,14 @@ def status_garantia(produto: Produto, hoje: date | None = None) -> str:
     return "vigente"
 
 
+def contar_por_status(produtos: list[Produto], hoje: date | None = None) -> dict[str, int]:
+    """Quantos produtos há em cada status, para os cartões de resumo da tela."""
+    contagem = {"vigente": 0, "vence_em_breve": 0, "vencida": 0}
+    for produto in produtos:
+        contagem[status_garantia(produto, hoje)] += 1
+    return contagem
+
+
 def vence_ate(produto: Produto, limite: date) -> bool:
     return date.today() <= data_vencimento(produto) <= limite
 

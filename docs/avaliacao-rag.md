@@ -31,3 +31,29 @@ Modelos locais: embeddings `bge-m3`, texto `llama3.2:3b`. Temperatura 0, 4 trech
 - Testar com um manual ou termo real em PDF do usuário.
 - Repetir com o Claude e comparar (respostas, citações inventadas, tempo).
 - Montar um conjunto fixo de perguntas e respostas esperadas para medir na etapa 7.
+
+## Conversa com produto (28/10/2026)
+
+O chat passou a ter o CDC como base geral e o termo de garantia de cada produto. Se a pergunta
+depende do produto, ele pergunta de qual aparelho se trata. Teste com os modelos locais:
+
+| Fala | Resultado |
+|---|---|
+| "Qual o prazo do CDC para reclamar de defeito em produto durável?" | ✅ 90 dias, só com o CDC |
+| "A garantia cobre tela quebrada?" | ✅ perguntou de qual produto |
+| "o celular moto g60" | ✅ achou o produto e respondeu com o termo dele |
+| "e quanto tempo de garantia?" | ❌ tratou como pergunta geral (o classificador via só a frase solta) |
+
+Correção: o classificador recebe o produto da conversa no prompt. Repetido, a quarta fala
+respondeu com o termo do Moto G60.
+
+Lições:
+
+1. **Pergunta de seguimento perde o contexto** se a classificação olhar só a última frase.
+2. **Indexar o CDC** (120 trechos) leva ~2,5 min com o bge-m3 na CPU. No app, scripts órfãos de
+   reruns do Streamlit rodaram várias indexações ao mesmo tempo e chegaram a 10 min; agora ela
+   roda uma vez, numa thread, ao abrir o app.
+3. **Latência no modelo local**: ~40 a 60 s por resposta, a maior parte gerando texto na CPU.
+   Reduzido por ora para 3 trechos e no máximo 250 tokens (ver `TRECHOS_POR_RESPOSTA` em
+   `conversa.py` e `LIMITE_RESPOSTA_OLLAMA` em `llm.py`). Voltar a 5 trechos e tirar o limite
+   com o Claude.

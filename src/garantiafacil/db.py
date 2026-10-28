@@ -3,11 +3,26 @@
 import sqlite3
 from pathlib import Path
 
+from garantiafacil.modelos import Categoria, TipoDocumento
+
+
+def _valores(enum) -> str:
+    return ", ".join(f"'{item.value}'" for item in enum)
+
+
+# Restrições geradas a partir das enums: o banco só aceita os valores do domínio.
+_COLUNA_CATEGORIA = f"categoria TEXT CHECK (categoria IN ({_valores(Categoria)}))"
+_COLUNA_FOTO = "foto TEXT"
+_COLUNA_TIPO = (
+    f"tipo TEXT NOT NULL DEFAULT '{TipoDocumento.NOTA_FISCAL.value}' "
+    f"CHECK (tipo IN ({_valores(TipoDocumento)}))"
+)
+
 RAIZ = Path(__file__).resolve().parents[2]  # pasta do projeto
 PASTA_DADOS = RAIZ / "data"
 CAMINHO_BANCO = PASTA_DADOS / "garantiafacil.db"
 
-SCHEMA = """
+SCHEMA = f"""
 CREATE TABLE IF NOT EXISTS produtos (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     nome TEXT NOT NULL,
@@ -15,7 +30,9 @@ CREATE TABLE IF NOT EXISTS produtos (
     data_compra TEXT NOT NULL,            -- ISO: AAAA-MM-DD
     prazo_garantia_meses INTEGER NOT NULL,
     valor REAL,
-    observacoes TEXT NOT NULL DEFAULT ''
+    observacoes TEXT NOT NULL DEFAULT '',
+    {_COLUNA_CATEGORIA},
+    {_COLUNA_FOTO}
 );
 
 -- Vetor de significado de cada produto (embedding), guardado como bytes de float32.
@@ -42,7 +59,8 @@ CREATE TABLE IF NOT EXISTS comprovantes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     produto_id INTEGER NOT NULL REFERENCES produtos(id) ON DELETE CASCADE,
     nome_original TEXT NOT NULL,
-    caminho TEXT NOT NULL
+    caminho TEXT NOT NULL,
+    {_COLUNA_TIPO}
 );
 """
 
@@ -60,4 +78,20 @@ def conectar(
     conexao.row_factory = sqlite3.Row  # permite acessar colunas por nome: linha["nome"]
     conexao.execute("PRAGMA foreign_keys = ON")
     conexao.executescript(SCHEMA)
+    _migrar(conexao)
     return conexao
+
+
+def _migrar(conexao: sqlite3.Connection) -> None:
+    """Bancos criados antes de uma coluna existir não a ganham pelo CREATE TABLE IF NOT EXISTS;
+    aqui acrescentamos o que faltar sem perder os dados."""
+    _garantir_coluna(conexao, "produtos", "categoria", _COLUNA_CATEGORIA)
+    _garantir_coluna(conexao, "produtos", "foto", _COLUNA_FOTO)
+    _garantir_coluna(conexao, "comprovantes", "tipo", _COLUNA_TIPO)
+
+
+def _garantir_coluna(conexao: sqlite3.Connection, tabela: str, coluna: str, definicao: str) -> None:
+    colunas = {linha["name"] for linha in conexao.execute(f"PRAGMA table_info({tabela})")}
+    if coluna not in colunas:
+        conexao.execute(f"ALTER TABLE {tabela} ADD COLUMN {definicao}")
+        conexao.commit()

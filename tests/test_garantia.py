@@ -53,3 +53,20 @@ def test_status_vence_hoje_ainda_vale():
 def test_status_vencida():
     p = produto(date(2026, 1, 1), 12)
     assert status_garantia(p, hoje=date(2027, 1, 2)) == "vencida"
+
+
+def test_contar_por_status():
+    from garantiafacil.garantia import contar_por_status
+
+    hoje = date(2026, 6, 1)
+
+    def produto(compra: date, meses: int = 12) -> Produto:
+        return Produto(nome="x", loja="y", data_compra=compra, prazo_garantia_meses=meses)
+
+    produtos = [
+        produto(date(2026, 1, 1)),  # vence em 01/01/2027: vigente
+        produto(date(2025, 6, 20)),  # vence em 20/06/2026: faltam 19 dias
+        produto(date(2025, 1, 1)),  # venceu em 01/01/2026
+    ]
+
+    assert contar_por_status(produtos, hoje) == {"vigente": 1, "vence_em_breve": 1, "vencida": 1}

@@ -9,7 +9,7 @@ import numpy as np
 
 from garantiafacil import embeddings
 from garantiafacil.db import PASTA_DADOS
-from garantiafacil.modelos import Comprovante, Produto
+from garantiafacil.modelos import Categoria, Comprovante, Produto, TipoDocumento
 
 
 def _linha_para_produto(linha: sqlite3.Row) -> Produto:
@@ -21,6 +21,8 @@ def _linha_para_produto(linha: sqlite3.Row) -> Produto:
         prazo_garantia_meses=linha["prazo_garantia_meses"],
         valor=linha["valor"],
         observacoes=linha["observacoes"],
+        categoria=Categoria(linha["categoria"]) if linha["categoria"] else None,
+        foto=linha["foto"],
     )
 
 
@@ -47,8 +49,9 @@ class Repositorio:
     def adicionar(self, produto: Produto) -> Produto:
         # Os "?" evitam SQL injection: nunca monte SQL concatenando texto do usuário.
         cursor = self.conexao.execute(
-            "INSERT INTO produtos (nome, loja, data_compra, prazo_garantia_meses, valor, observacoes) "
-            "VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO produtos "
+            "(nome, loja, data_compra, prazo_garantia_meses, valor, observacoes, categoria) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",  # a foto é salva à parte, em salvar_foto()
             (
                 produto.nome,
                 produto.loja,
@@ -56,6 +59,7 @@ class Repositorio:
                 produto.prazo_garantia_meses,
                 produto.valor,
                 produto.observacoes,
+                produto.categoria.value if produto.categoria else None,
             ),
         )
         self.conexao.commit()
@@ -72,6 +76,13 @@ class Repositorio:
     def listar(self) -> list[Produto]:
         linhas = self.conexao.execute("SELECT * FROM produtos ORDER BY data_compra DESC").fetchall()
         return [_linha_para_produto(linha) for linha in linhas]
+
+    def atualizar_categoria(self, produto_id: int, categoria: Categoria | None) -> None:
+        self.conexao.execute(
+            "UPDATE produtos SET categoria = ? WHERE id = ?",
+            (categoria.value if categoria else None, produto_id),
+        )
+        self.conexao.commit()
 
     def buscar(self, texto: str) -> list[Produto]:
         """Busca por palavra no nome, loja ou observações (LIKE).
@@ -139,16 +150,38 @@ class Repositorio:
         resultados.sort(key=lambda par: par[1], reverse=True)
         return resultados[:limite]
 
+    def salvar_foto(self, produto_id: int, nome_original: str, conteudo: bytes) -> str:
+        """Guarda a foto do produto (troca a anterior, se houver) e devolve o caminho."""
+        produto = self.obter(produto_id)
+        if produto and produto.foto:
+            Path(produto.foto).unlink(missing_ok=True)
+
+        pasta = self.pasta_comprovantes / str(produto_id)
+        pasta.mkdir(parents=True, exist_ok=True)
+        caminho = pasta / f"foto_{uuid.uuid4().hex[:8]}_{Path(nome_original).name}"
+        caminho.write_bytes(conteudo)
+
+        self.conexao.execute("UPDATE produtos SET foto = ? WHERE id = ?", (str(caminho), produto_id))
+        self.conexao.commit()
+        return str(caminho)
+
     def excluir(self, produto_id: int) -> None:
         for comprovante in self.listar_comprovantes(produto_id):
             Path(comprovante.caminho).unlink(missing_ok=True)
+        produto = self.obter(produto_id)
+        if produto and produto.foto:
+            Path(produto.foto).unlink(missing_ok=True)
         self.conexao.execute("DELETE FROM produtos WHERE id = ?", (produto_id,))
         self.conexao.commit()
 
     # ---------- comprovantes ----------
 
     def adicionar_comprovante(
-        self, produto_id: int, nome_original: str, conteudo: bytes
+        self,
+        produto_id: int,
+        nome_original: str,
+        conteudo: bytes,
+        tipo: TipoDocumento = TipoDocumento.NOTA_FISCAL,
     ) -> Comprovante:
         pasta = self.pasta_comprovantes / str(produto_id)
         pasta.mkdir(parents=True, exist_ok=True)
@@ -159,8 +192,9 @@ class Repositorio:
         caminho.write_bytes(conteudo)
 
         cursor = self.conexao.execute(
-            "INSERT INTO comprovantes (produto_id, nome_original, caminho) VALUES (?, ?, ?)",
-            (produto_id, nome_seguro, str(caminho)),
+            "INSERT INTO comprovantes (produto_id, nome_original, caminho, tipo) "
+            "VALUES (?, ?, ?, ?)",
+            (produto_id, nome_seguro, str(caminho), tipo.value),
         )
         self.conexao.commit()
         return Comprovante(
@@ -168,6 +202,7 @@ class Repositorio:
             produto_id=produto_id,
             nome_original=nome_seguro,
             caminho=str(caminho),
+            tipo=tipo,
         )
 
     def listar_comprovantes(self, produto_id: int) -> list[Comprovante]:
@@ -180,6 +215,7 @@ class Repositorio:
                 produto_id=linha["produto_id"],
                 nome_original=linha["nome_original"],
                 caminho=linha["caminho"],
+                tipo=TipoDocumento(linha["tipo"]),
             )
             for linha in linhas
         ]

@@ -1,4 +1,5 @@
 from datetime import date
+from pathlib import Path
 
 import numpy as np
 import pytest
@@ -201,3 +202,128 @@ def test_excluir_remove_o_embedding(repo):
     repo.excluir(salvo.id)
 
     assert repo.conexao.execute("SELECT COUNT(*) FROM embeddings").fetchone()[0] == 0
+
+
+# ---------- categoria ----------
+
+
+def test_categoria_e_gravada_e_lida(repo):
+    from garantiafacil.modelos import Categoria
+
+    produto = novo_produto()
+    produto.categoria = Categoria.ELETRODOMESTICOS
+    salvo = repo.adicionar(produto)
+
+    assert repo.obter(salvo.id).categoria is Categoria.ELETRODOMESTICOS
+
+
+def test_categoria_e_opcional(repo):
+    salvo = repo.adicionar(novo_produto())
+
+    assert repo.obter(salvo.id).categoria is None
+
+
+def test_banco_recusa_categoria_fora_do_dominio(repo):
+    import sqlite3
+
+    salvo = repo.adicionar(novo_produto())
+
+    with pytest.raises(sqlite3.IntegrityError):
+        repo.conexao.execute("UPDATE produtos SET categoria = 'Roupas' WHERE id = ?", (salvo.id,))
+
+
+def test_banco_antigo_sem_coluna_categoria_e_migrado(tmp_path):
+    import sqlite3
+
+    caminho = tmp_path / "antigo.db"
+    antigo = sqlite3.connect(caminho)
+    antigo.execute(
+        "CREATE TABLE produtos (id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT NOT NULL, "
+        "loja TEXT NOT NULL, data_compra TEXT NOT NULL, prazo_garantia_meses INTEGER NOT NULL, "
+        "valor REAL, observacoes TEXT NOT NULL DEFAULT '')"
+    )
+    antigo.execute(
+        "INSERT INTO produtos (nome, loja, data_compra, prazo_garantia_meses) "
+        "VALUES ('Xbox', 'Loja', '2026-01-01', 12)"
+    )
+    antigo.commit()
+    antigo.close()
+
+    repo = Repositorio(conectar(caminho), gerar_embedding=embedding_falso, nome_modelo=lambda: "f")
+
+    [produto] = repo.listar()
+    assert produto.nome == "Xbox" and produto.categoria is None
+
+
+def test_atualizar_categoria_de_produto_existente(repo):
+    from garantiafacil.modelos import Categoria
+
+    salvo = repo.adicionar(novo_produto())
+
+    repo.atualizar_categoria(salvo.id, Categoria.FERRAMENTAS)
+    assert repo.obter(salvo.id).categoria is Categoria.FERRAMENTAS
+
+    repo.atualizar_categoria(salvo.id, None)
+    assert repo.obter(salvo.id).categoria is None
+
+
+# ---------- foto e tipo de documento ----------
+
+
+def test_foto_do_produto_e_salva_e_trocada(repo):
+    salvo = repo.adicionar(novo_produto())
+    assert repo.obter(salvo.id).foto is None
+
+    primeira = repo.salvar_foto(salvo.id, "a.jpg", b"1")
+    segunda = repo.salvar_foto(salvo.id, "b.jpg", b"2")
+
+    assert repo.obter(salvo.id).foto == segunda
+    assert not Path(primeira).exists()  # a foto anterior é apagada
+    assert Path(segunda).read_bytes() == b"2"
+
+
+def test_excluir_produto_apaga_a_foto(repo):
+    salvo = repo.adicionar(novo_produto())
+    caminho = repo.salvar_foto(salvo.id, "a.jpg", b"1")
+
+    repo.excluir(salvo.id)
+
+    assert not Path(caminho).exists()
+
+
+def test_documento_guarda_o_tipo_e_o_padrao_e_nota_fiscal(repo):
+    from garantiafacil.modelos import TipoDocumento
+
+    salvo = repo.adicionar(novo_produto())
+    repo.adicionar_comprovante(salvo.id, "cupom.jpg", b"x")
+    repo.adicionar_comprovante(salvo.id, "termo.pdf", b"y", TipoDocumento.TERMO_GARANTIA)
+
+    tipos = [c.tipo for c in repo.listar_comprovantes(salvo.id)]
+
+    assert tipos == [TipoDocumento.NOTA_FISCAL, TipoDocumento.TERMO_GARANTIA]
+
+
+def test_banco_antigo_com_comprovantes_sem_tipo_e_migrado(tmp_path):
+    import sqlite3
+
+    from garantiafacil.modelos import TipoDocumento
+
+    caminho = tmp_path / "antigo.db"
+    antigo = sqlite3.connect(caminho)
+    antigo.executescript(
+        "CREATE TABLE produtos (id INTEGER PRIMARY KEY AUTOINCREMENT, nome TEXT NOT NULL, "
+        "loja TEXT NOT NULL, data_compra TEXT NOT NULL, prazo_garantia_meses INTEGER NOT NULL, "
+        "valor REAL, observacoes TEXT NOT NULL DEFAULT '');"
+        "CREATE TABLE comprovantes (id INTEGER PRIMARY KEY AUTOINCREMENT, produto_id INTEGER "
+        "NOT NULL, nome_original TEXT NOT NULL, caminho TEXT NOT NULL);"
+        "INSERT INTO produtos (nome, loja, data_compra, prazo_garantia_meses) "
+        "VALUES ('Xbox', 'Loja', '2026-01-01', 12);"
+        "INSERT INTO comprovantes (produto_id, nome_original, caminho) VALUES (1, 'n.jpg', 'x');"
+    )
+    antigo.commit()
+    antigo.close()
+
+    repo = Repositorio(conectar(caminho), gerar_embedding=embedding_falso, nome_modelo=lambda: "f")
+
+    assert repo.listar()[0].foto is None
+    assert repo.listar_comprovantes(1)[0].tipo is TipoDocumento.NOTA_FISCAL

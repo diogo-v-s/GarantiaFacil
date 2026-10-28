@@ -34,6 +34,10 @@ SISTEMA_ANALISE = (
     "'Posso desistir de uma compra feita pela internet?' -> false, ''"
 )
 
+# Menos trechos = prompt menor = resposta mais rápida na CPU, mas o modelo vê menos contexto.
+# Era 5; voltar a 5 (ou mais) quando o chat passar para o Claude.
+TRECHOS_POR_RESPOSTA = 3
+
 _PALAVRAS_VAZIAS = {
     "de", "da", "do", "das", "dos", "o", "a", "os", "as", "um", "uma", "meu", "minha",
     "no", "na", "com", "para", "por", "e",
@@ -199,7 +203,7 @@ class Conversa:
             pergunta,
             self.llm,
             produto_id=produto.id if produto else None,
-            k=5,
+            k=TRECHOS_POR_RESPOSTA,
             so_gerais=so_gerais,
         )
         return Mensagem(
