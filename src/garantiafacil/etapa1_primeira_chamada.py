@@ -11,9 +11,9 @@ def main():
     print(f"Provedor: {type(llm).__name__} | modelo: {llm.modelo}\n")
 
     sistema = "Você é um assistente que explica direitos do consumidor brasileiro em linguagem simples."
-    pergunta = "Qual o prazo legal para reclamar de um defeito em um produto durável, como uma geladeira?"
+    pergunta = "Qual o minimo de garantia um produto comprado em loja e novo, deve ter?"
 
-    print(llm.perguntar(pergunta, sistema=sistema))
+    print(llm.perguntar(pergunta))
 
 
 if __name__ == "__main__":

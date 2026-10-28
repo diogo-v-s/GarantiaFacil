@@ -17,7 +17,9 @@ class OllamaLlm:
     def __init__(self, modelo: str):
         self.modelo = modelo
 
-    def perguntar(self, prompt: str, sistema: str | None = None) -> str:
+    def perguntar(
+        self, prompt: str, sistema: str | None = None, temperatura: float | None = None
+    ) -> str:
         import ollama
 
         mensagens = []
@@ -25,7 +27,12 @@ class OllamaLlm:
             mensagens.append({"role": "system", "content": sistema})
         mensagens.append({"role": "user", "content": prompt})
 
-        resposta = ollama.chat(model=self.modelo, messages=mensagens)
+        # No Ollama, parâmetros de geração vão dentro de "options"
+        opcoes = {}
+        if temperatura is not None:
+            opcoes["temperature"] = temperatura
+
+        resposta = ollama.chat(model=self.modelo, messages=mensagens, options=opcoes)
         return resposta.message.content
 
 
@@ -35,15 +42,24 @@ class ClaudeLlm:
     def __init__(self, modelo: str):
         self.modelo = modelo
 
-    def perguntar(self, prompt: str, sistema: str | None = None) -> str:
+    def perguntar(
+        self, prompt: str, sistema: str | None = None, temperatura: float | None = None
+    ) -> str:
         import anthropic
 
         client = anthropic.Anthropic()  # usa ANTHROPIC_API_KEY do ambiente
+
+        # Na API da Anthropic, a temperatura é um argumento direto (0 a 1)
+        extras = {}
+        if temperatura is not None:
+            extras["temperature"] = temperatura
+
         resposta = client.messages.create(
             model=self.modelo,
             max_tokens=1024,
             system=sistema or "",
             messages=[{"role": "user", "content": prompt}],
+            **extras,
         )
         return resposta.content[0].text
 
