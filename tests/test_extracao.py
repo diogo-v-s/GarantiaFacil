@@ -1,10 +1,14 @@
 from datetime import date
 
 from garantiafacil.extracao import DadosNota, extrair_dados_nota
+from garantiafacil.modelos import Categoria
 
 
 def dados(**campos) -> DadosNota:
-    base = {"loja": "Loja X", "produto": "Notebook", "data_compra": "2026-03-05", "valor": 100.0}
+    base = {
+        "loja": "Loja X", "produto": "Notebook", "detalhes": "", "categoria": "Eletrônicos",
+        "data_compra": "2026-03-05", "valor": 100.0,
+    }  # fmt: skip
     return DadosNota(**{**base, **campos})
 
 
@@ -43,7 +47,17 @@ def test_data_invalida_vira_none():
     assert dados(data_compra="").data() is None
 
 
-def test_schema_tem_os_quatro_campos_obrigatorios():
+def test_schema_tem_os_campos_obrigatorios():
+    campos = {"produto", "detalhes", "categoria", "loja", "data_compra", "valor"}
     esquema = DadosNota.model_json_schema()
-    assert set(esquema["properties"]) == {"produto", "loja", "data_compra", "valor"}
-    assert set(esquema["required"]) == {"produto", "loja", "data_compra", "valor"}
+    assert set(esquema["properties"]) == campos
+    assert set(esquema["required"]) == campos
+
+
+def test_categoria_do_schema_acompanha_o_dominio():
+    esquema = DadosNota.model_json_schema()
+    assert set(esquema["properties"]["categoria"]["enum"]) == {c.value for c in Categoria}
+
+
+def test_categoria_padrao_converte_para_o_dominio():
+    assert dados(categoria="Móveis").categoria_padrao() == Categoria.MOVEIS

@@ -14,6 +14,7 @@ from garantiafacil.chave_acesso import ChaveAcesso, interpretar
 from garantiafacil.consulta_cnpj import buscar_razao_social
 from garantiafacil.extracao import extrair_dados_nota, ler_chave_impressa
 from garantiafacil.leitor_qr import ler_chave_do_qr
+from garantiafacil.modelos import Categoria
 
 
 @dataclass
@@ -22,6 +23,8 @@ class ResultadoNota:
     produto: str
     data_compra: date | None
     valor: float
+    categoria: Categoria | None = None
+    detalhes: str = ""  # vai para o campo Observações do cadastro
     avisos: list[str] = field(default_factory=list)
 
 
@@ -51,7 +54,12 @@ def ler_nota(
     podem ser trocadas nos testes."""
     ia = extrair_dados_nota(imagem, tipo_midia, llm)
     resultado = ResultadoNota(
-        loja=ia.loja, produto=ia.produto, data_compra=ia.data(), valor=ia.valor
+        loja=ia.loja,
+        produto=ia.produto,
+        data_compra=ia.data(),
+        valor=ia.valor,
+        categoria=ia.categoria_padrao(),
+        detalhes=ia.detalhes.strip(),
     )
 
     # Primeiro o QR code (exato e rápido); se falhar, a IA lê a chave impressa. Nos dois casos

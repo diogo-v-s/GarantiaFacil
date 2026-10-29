@@ -1,11 +1,16 @@
 """Extração de dados de uma foto de nota fiscal usando um LLM com visão."""
 
 from datetime import date, datetime
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
 from garantiafacil.chave_acesso import buscar_chave
 from garantiafacil.llm import criar_llm
+from garantiafacil.modelos import Categoria
+
+# Uma escolha entre opções fechadas (como o classificador do chat): o modelo é obrigado a decidir.
+CategoriaLida = Literal[tuple(c.value for c in Categoria)]  # type: ignore[valid-type]
 
 # Atenção: campos opcionais (`str | None`) e a instrução "use null se não souber" faziam o modelo
 # local devolver null em quase tudo. Campos obrigatórios e instruções positivas funcionaram bem.
@@ -23,10 +28,24 @@ class DadosNota(BaseModel):
 
     loja: str = Field(description="Nome da empresa que emitiu o documento (razão social do emitente)")
     produto: str = Field(
-        description="Descrição do item vendido (se houver vários itens, o de maior valor)"
+        description="Nome curto do item vendido: marca, tipo e modelo, sem cor, quantidade, "
+        "código ou texto de rodapé (se houver vários itens, o de maior valor). "
+        "Ex.: 'Smartphone Motorola Moto E13'"
+    )
+    detalhes: str = Field(
+        description="Só características do próprio item que ficaram fora do nome (cor, "
+        "capacidade, tamanho, código do produto), copiadas como estão. NÃO inclua preço, "
+        "quantidade, pagamento, impostos nem dados da nota. Texto vazio se não sobrou nada"
+    )
+    categoria: CategoriaLida = Field(
+        description="Categoria do item vendido. Use Outros se não for claramente de uma das "
+        "outras (ex.: lentes de óculos, material de escritório)"
     )
     data_compra: str = Field(description="Data de emissão, como aparece no documento")
     valor: float = Field(description="Valor total da nota em reais, com ponto como decimal")
+
+    def categoria_padrao(self) -> Categoria:
+        return Categoria(self.categoria)
 
     def data(self) -> date | None:
         """Converte o texto da data para `date`; None se o modelo devolveu algo inválido.

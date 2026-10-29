@@ -170,7 +170,7 @@ def tela_cadastro(repo: Repositorio):
 
     imagens = [a for a in arquivos if Path(a.name).suffix.lower() in EXTENSOES_IMAGEM]
     if imagens and st.button("📷 Ler nota fiscal com IA"):
-        with st.spinner("Lendo a nota (no Ollama local pode levar um minuto)..."):
+        with st.spinner("Lendo a nota fiscal (pode levar alguns segundos)..."):
             try:
                 st.session_state["sugestao"] = ler_nota(
                     imagens[0].getvalue(), tipo_midia=imagens[0].type
@@ -189,7 +189,8 @@ def tela_cadastro(repo: Repositorio):
         coluna_loja, coluna_categoria = st.columns(2)
         loja = coluna_loja.text_input("Loja *", value=(sugestao.loja if sugestao else "") or "")
         categoria = coluna_categoria.selectbox(
-            "Categoria", list(Categoria), index=None, placeholder="Escolha uma categoria",
+            "Categoria", list(Categoria), placeholder="Escolha uma categoria",
+            index=list(Categoria).index(sugestao.categoria) if sugestao and sugestao.categoria else None,
             format_func=lambda c: c.value,
         )
         coluna1, coluna2, coluna3 = st.columns(3)
@@ -210,7 +211,7 @@ def tela_cadastro(repo: Repositorio):
             "Foto do produto (opcional; sem foto, usamos a imagem da categoria)",
             type=["png", "jpg", "jpeg", "webp"],
         )
-        observacoes = st.text_area("Observações")
+        observacoes = st.text_area("Observações", value=sugestao.detalhes if sugestao else "")
         enviado = st.form_submit_button("Salvar", type="primary")
 
     if not enviado:

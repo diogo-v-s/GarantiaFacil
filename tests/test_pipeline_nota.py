@@ -20,7 +20,10 @@ class LlmFalso:
 
 
 def ia(**campos) -> LlmFalso:
-    base = {"loja": "Loja da IA", "produto": "Notebook", "data_compra": "12/08/2026", "valor": 100.0}
+    base = {
+        "loja": "Loja da IA", "produto": "Notebook", "detalhes": "", "categoria": "Eletrônicos",
+        "data_compra": "12/08/2026", "valor": 100.0,
+    }  # fmt: skip
     return LlmFalso(DadosNota(**{**base, **campos}))
 
 
@@ -161,3 +164,13 @@ def test_qr_valido_nao_aciona_a_leitura_pela_ia():
     )
 
     assert chamadas == []
+
+
+def test_detalhes_e_categoria_da_ia_vao_para_o_resultado():
+    llm = ia(produto="Smartphone Moto E13", detalhes=" Vermelho, 64GB ", categoria="Eletrônicos")
+
+    resultado = ler_nota(b"img", llm=llm, ler_chave=sem_qr)
+
+    assert resultado.produto == "Smartphone Moto E13"
+    assert resultado.detalhes == "Vermelho, 64GB"
+    assert resultado.categoria.value == "Eletrônicos"
