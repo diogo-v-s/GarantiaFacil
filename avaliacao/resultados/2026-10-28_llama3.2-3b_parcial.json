@@ -1,0 +1,91 @@
+{
+  "modelo": "llama3.2:3b",
+  "data_simulada": "2026-10-28",
+  "nota": "7/7",
+  "resultados": [
+    {
+      "caso": "termo-01-tela-quebrada",
+      "tipo": "termo",
+      "passou": true,
+      "falhas": [],
+      "rota": "documentos_produto",
+      "ferramentas": [],
+      "texto": "Não, a garantia não cobre tela quebrada ou trincada por impacto, de acordo com o documento [1].",
+      "segundos": 34.823864799996954,
+      "opcional": false,
+      "produto": "Smart TV Samsung 50"
+    },
+    {
+      "caso": "termo-02-defeito-painel",
+      "tipo": "termo",
+      "passou": true,
+      "falhas": [],
+      "rota": "documentos_produto",
+      "ferramentas": [],
+      "texto": "Sim, a garantia da TV Samsung cobre defeitos de fabricação no painel, conforme especificado no [1].",
+      "segundos": 6.733823700000357,
+      "opcional": false,
+      "produto": "Smart TV Samsung 50"
+    },
+    {
+      "caso": "termo-03-prazo",
+      "tipo": "termo",
+      "passou": true,
+      "falhas": [],
+      "rota": "documentos_produto",
+      "ferramentas": [],
+      "texto": "A garantia da Smart TV Samsung dura 12 meses, contados da data de emissão da nota fiscal de compra. [1]",
+      "segundos": 13.426798899999994,
+      "opcional": false,
+      "produto": "Smart TV Samsung 50"
+    },
+    {
+      "caso": "termo-04-assistencia",
+      "tipo": "termo",
+      "passou": true,
+      "falhas": [],
+      "rota": "documentos_produto",
+      "ferramentas": [],
+      "texto": "Sim, de acordo com o Termo de Garantia [1], o reparo da TV precisa ser feito em assistência técnica autorizada. Além disso, a abertura do aparelho por terceiros faz perder a garantia.",
+      "segundos": 28.04232910000428,
+      "opcional": false,
+      "produto": "Smart TV Samsung 50"
+    },
+    {
+      "caso": "sem-01-geladeira",
+      "tipo": "sem_termo",
+      "passou": true,
+      "falhas": [],
+      "rota": "sem_termo",
+      "ferramentas": [],
+      "texto": "Não há termo de garantia cadastrado para 'Geladeira Brastemp 375L'. Pelo CDC:\n\nDe acordo com a lei, a garantia da geladeira cobre defeitos de qualidade ou quantidade que a tornem imprópria ou inadequada ao consumo, bem como aqueles decorrentes da disparidade das indicações constantes do recipiente, da embalagem, rotulagem ou mensagem publicitária. O consumidor pode exigir a substituição das partes viciadas, a substituição do produto por outro da mesma espécie em perfeitas condições de uso, a restituição imediata da quantia paga, monetariamente atualizada, ou o abatimento proporcional do preço.",
+      "segundos": 48.01284339999984,
+      "opcional": false,
+      "produto": "Geladeira Brastemp 375L"
+    },
+    {
+      "caso": "sem-02-notebook",
+      "tipo": "sem_termo",
+      "passou": true,
+      "falhas": [],
+      "rota": "sem_termo",
+      "ferramentas": [],
+      "texto": "Não há termo de garantia cadastrado para 'Notebook Dell Inspiron 15'. Pelo CDC:\n\nSim, de acordo com o artigo 18, o consumidor pode exigir a substituição das partes viciadas, incluindo a bateria, se o notebook estiver com defeito de qualidade ou quantidade. O consumidor também pode exigir a restituição imediata da quantia paga, monetariamente atualizada, ou o abatimento proporcional do preço, se preferir.",
+      "segundos": 20.985123500002373,
+      "opcional": false,
+      "produto": "Notebook Dell Inspiron 15"
+    },
+    {
+      "caso": "sem-03-furadeira",
+      "tipo": "sem_termo",
+      "passou": true,
+      "falhas": [],
+      "rota": "sem_termo",
+      "ferramentas": [],
+      "texto": "Não há termo de garantia cadastrado para 'Furadeira Bosch'. Pelo CDC:\n\nDe acordo com a lei, o consumidor tem direito a uma garantia legal que é complementar à garantia contratual. A garantia legal é garantida pelo Código de Defesa do Consumidor e é aplicada a todos os produtos e serviços, incluindo a furadeira. O consumidor pode exigir a substituição do produto por outro da mesma espécie, em perfeitas condições de uso, a restituição imediata da quantia paga, monetariamente atualizada, sem prejuízo de eventuais perdas e danos, ou o abatimento proporcional do preço. O consumidor também tem o direito de exigir a substituição do produto em caso de vício de qualidade ou quantidade.",
+      "segundos": 22.495369099997333,
+      "opcional": false,
+      "produto": "Furadeira Bosch"
+    }
+  ]
+}

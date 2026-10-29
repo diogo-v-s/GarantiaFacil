@@ -1,0 +1,26 @@
+{
+  "modelo": "claude-haiku-5-5",
+  "data_simulada": "2026-10-28",
+  "nota": "1/1",
+  "resultados": [
+    {
+      "caso": "cad-02-em-garantia",
+      "tipo": "cadastro",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "listar_produtos",
+          {
+            "status": "em_garantia"
+          }
+        ]
+      ],
+      "texto": "Quatro produtos ainda estão na garantia:\n\n- **Notebook Dell Inspiron 15**: garantia até 01/10/2027\n- **Geladeira Brastemp 375L**: garantia até 10/03/2027\n- **Smart TV Samsung 50**: garantia até 15/12/2026\n- **Furadeira Bosch**: garantia até 20/11/2026 (vence em breve)",
+      "segundos": 16.00015560000611,
+      "opcional": false,
+      "produto": null
+    }
+  ]
+}

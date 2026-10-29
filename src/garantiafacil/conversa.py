@@ -9,6 +9,7 @@ Fluxo de cada mensagem:
      se também não houver, pergunta.
 """
 
+import os
 import re
 import unicodedata
 from dataclasses import dataclass, field
@@ -47,9 +48,16 @@ SISTEMA_ANALISE = (
     "'O que a garantia do meu ventilador não cobre?' -> produto"
 )
 
-# Menos trechos = prompt menor = resposta mais rápida na CPU, mas o modelo vê menos contexto.
-# Era 5; voltar a 5 (ou mais) quando o chat passar para o Claude.
-TRECHOS_POR_RESPOSTA = 3
+# Menos trechos = prompt menor = resposta mais rápida, mas o modelo vê menos contexto.
+# O modelo local roda na CPU e fica lento com prompt grande; o Claude lê 5 trechos sem custo de tempo.
+TRECHOS_OLLAMA = 3
+TRECHOS_CLAUDE = 5
+
+
+def trechos_por_resposta() -> int:
+    """Quantos trechos entregar ao modelo, conforme o provedor (LLM_PROVIDER no .env)."""
+    claude = os.getenv("LLM_PROVIDER", "ollama").lower() == "claude"
+    return TRECHOS_CLAUDE if claude else TRECHOS_OLLAMA
 
 # Resposta do usuário que é só a posição de uma opção: "2", "o 2", "número 2", "o primeiro".
 _ORDINAIS = {"primeiro": 1, "primeira": 1, "segundo": 2, "segunda": 2, "terceiro": 3, "terceira": 3,
@@ -70,7 +78,8 @@ SISTEMA_SEM_TERMO = (
     "O produto do usuário não tem termo de garantia cadastrado, então vale a garantia legal do "
     "Código de Defesa do Consumidor. Com base nos trechos, explique em português o que a lei "
     "prevê sobre a pergunta (defeitos, prazos para reclamar, o que o consumidor pode exigir), "
-    "citando o número do trecho, como [1]. Responda em no máximo 5 linhas, sem repetir a "
+    "citando o número do trecho, como [1], só no fim da frase. Nunca escreva a palavra "
+    "'trecho' no texto da resposta. Responda em no máximo 5 linhas, sem repetir a "
     "pergunta e sem introdução. Cite apenas números de trechos que existem. "
     "Se os trechos não tratarem exatamente da pergunta, explique o que a lei garante em geral. "
     "Não diga que não encontrou."
@@ -112,6 +121,22 @@ class Mensagem:
     consultas: list[Consulta] = field(default_factory=list)  # ferramentas que o agente usou
 
 
+_SINAIS_DE_CADASTRO = re.compile(
+    r"\b(vence|vencem|venceu|venceram|vencimento|comprei|paguei|gastei|cadastrei)\b"
+)
+# Com estas palavras a pergunta é de cobertura, de lei ou condicional: fica com o classificador.
+_SINAIS_DE_OUTRO_ASSUNTO = re.compile(
+    r"\b(cobre|cobrir|cobertura|assistencia|lei|codigo|cdc|direito|direitos|posso|se)\b"
+)
+
+
+def _fala_do_cadastro(mensagem: str) -> bool:
+    """A mensagem tem um verbo claro de dado cadastrado (vence, comprei, paguei...) e nada que
+    indique cobertura, lei ou condição?"""
+    texto = _normalizar(mensagem)
+    return bool(_SINAIS_DE_CADASTRO.search(texto)) and not _SINAIS_DE_OUTRO_ASSUNTO.search(texto)
+
+
 def _normalizar(texto: str) -> str:
     """Minúsculas e sem acento ('Número' -> 'numero')."""
     decomposto = unicodedata.normalize("NFD", texto.lower())
@@ -146,6 +171,10 @@ class Conversa:
             # a mensagem era uma pergunta nova: segue o fluxo normal
 
         analise = self.llm.estruturar(self._prompt_analise(mensagem), Analise, sistema=SISTEMA_ANALISE)
+        if analise.assunto != "cadastro" and _fala_do_cadastro(mensagem):
+            # O classificador local oscila ("quando vence a garantia do LP KODAK?" saiu como
+            # produto e respondeu com o CDC). Palavras como "vence" e "paguei" não deixam dúvida.
+            analise = Analise(assunto="cadastro", produto_citado=analise.produto_citado)
         # "cadastro" e "produto" são exclusivos: "o que a garantia desse produto cobre?" é de termo
         # e lei, e o agente só conhece o cadastro (quando eram dois sim/não, inventava a cobertura).
         if analise.sobre_cadastro:
@@ -286,7 +315,7 @@ class Conversa:
         """Sem termo cadastrado: avisa e explica o que o CDC prevê (garantia legal)."""
         trechos = self.base.buscar(CONSULTA_GARANTIA_LEGAL, so_gerais=True, k=2)
         for trecho in self.base.buscar(pergunta, so_gerais=True, k=2):
-            if len(trechos) < TRECHOS_POR_RESPOSTA and all(t.texto != trecho.texto for t in trechos):
+            if len(trechos) < trechos_por_resposta() and all(t.texto != trecho.texto for t in trechos):
                 trechos.append(trecho)
         resposta = self.base.responder_com_trechos(pergunta, self.llm, trechos, SISTEMA_SEM_TERMO)
         aviso = f"Não há termo de garantia cadastrado para '{produto.nome}'. Pelo CDC:\n\n"
@@ -308,7 +337,7 @@ class Conversa:
         # produto junto, senão acha trechos do CDC em vez do termo dele (caso ctx-03 da avaliação).
         consulta = f"{produto.nome}: {pergunta}" if produto else pergunta
         trechos = self.base.buscar(
-            consulta, produto.id if produto else None, TRECHOS_POR_RESPOSTA, so_gerais
+            consulta, produto.id if produto else None, trechos_por_resposta(), so_gerais
         )
         resposta = self.base.responder_com_trechos(pergunta, self.llm, trechos)
         return Mensagem(

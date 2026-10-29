@@ -23,7 +23,7 @@ FILTROS_STATUS = {
 def sistema_agente(hoje: date | None = None) -> str:
     hoje = hoje or date.today()
     return (
-        "Você é o assistente do GarantiaFácil e ajuda o usuário a consultar os produtos que ele "
+        "Você é o assistente do TáGuardado e ajuda o usuário a consultar os produtos que ele "
         f"cadastrou e suas garantias. Hoje é {hoje.strftime('%d/%m/%Y')}.\n"
         "Use as ferramentas para obter os dados. Nunca invente produtos, datas ou valores.\n"
         "Você só conhece os dados do cadastro (datas, valores, categorias, documentos guardados). "

@@ -23,13 +23,18 @@ from garantiafacil.llm import criar_llm
 from garantiafacil.imagens import imagem_padrao
 from garantiafacil.modelos import Categoria, Produto, TipoDocumento
 from garantiafacil.pipeline_nota import ler_nota
-from garantiafacil.rag import BaseConhecimento
+from garantiafacil.rag import BaseConhecimento, limpar_citacoes
 from garantiafacil.repositorio import Repositorio
 
 EXTENSOES_IMAGEM = {".png", ".jpg", ".jpeg", ".webp"}
 
 CAMINHO_CDC = Path(__file__).resolve().parents[2] / "docs" / "conhecimento" / "cdc.txt"
 FONTE_CDC = CAMINHO_CDC.name
+
+NOME_APP = "TáGuardado"
+PASTA_ASSETS = Path(__file__).resolve().parent / "assets"
+LOGO = PASTA_ASSETS / "logo.png"
+ICONE = PASTA_ASSETS / "icone.png"  # ícone da aba do navegador
 
 PAGINA_LISTA = "📦  Meus produtos"
 PAGINA_CADASTRO = "➕  Cadastrar"
@@ -68,8 +73,14 @@ ESTILO = """
 [data-testid="stSidebar"] [role="radiogroup"] label > div > div:first-child:not(:has(p)) {
     display: none;  /* bolinha do radio */
 }
-.logo { font-size: 1.5rem; font-weight: 800; padding: 4px 0 18px 4px; }
-.logo span { color: #2f45f5; }
+[data-testid="stSidebar"] [data-testid="stImage"] {  /* logo */
+    display: flex; justify-content: center; width: 100% !important; padding: 0 0 14px 0;
+}
+[data-testid="stSidebar"] [data-testid="stFullScreenFrame"] {
+    display: flex; justify-content: center;
+}
+[data-testid="stSidebarUserContent"] { padding-top: 1.5rem; }
+[data-testid="stSidebar"] [data-testid="stImage"] img { margin: 0 auto; }
 
 /* títulos */
 .titulo-pagina { font-size: 2rem !important; font-weight: 800; margin: 0; line-height: 1.2; }
@@ -512,20 +523,12 @@ def mostrar_mensagem(papel: str, conteudo):
             return
 
         mensagem: Mensagem = conteudo
-        st.markdown(mensagem.texto)
+        st.markdown(limpar_citacoes(mensagem.texto))
         if mensagem.produto:
             st.caption(f"Produto considerado: {mensagem.produto.nome}")
         if mensagem.citacoes_invalidas:
             numeros = ", ".join(f"[{n}]" for n in mensagem.citacoes_invalidas)
-            st.warning(f"A IA citou {numeros}, que não existe(m) nos trechos. Confira nas fontes.")
-        if mensagem.trechos:
-            with st.expander(f"Trechos usados ({len(mensagem.trechos)})"):
-                for i, trecho in enumerate(mensagem.trechos, 1):
-                    st.markdown(
-                        f"**[{i}] {trecho.fonte}, página {trecho.pagina}** "
-                        f"· similaridade {trecho.similaridade:.2f}"
-                    )
-                    st.text(trecho.texto)
+            st.warning(f"A IA citou {numeros}, que não existe(m). Esta resposta pode não ser confiável.")
 
 
 def tela_perguntas(repo: Repositorio, base: BaseConhecimento, indexacao: dict):
@@ -566,7 +569,7 @@ def tela_perguntas(repo: Repositorio, base: BaseConhecimento, indexacao: dict):
 
 
 def main():
-    st.set_page_config(page_title="GarantiaFácil", page_icon="🧾", layout="wide")
+    st.set_page_config(page_title=NOME_APP, page_icon=str(ICONE), layout="wide")
     st.markdown(ESTILO, unsafe_allow_html=True)
 
     repo = obter_repositorio()
@@ -579,7 +582,7 @@ def main():
         st.session_state["pagina"] = st.session_state.pop("ir_para")
 
     with st.sidebar:
-        st.markdown('<div class="logo">🧾 Garantia<span>Fácil</span></div>', unsafe_allow_html=True)
+        st.image(str(LOGO), width=140)
         pagina = st.radio("Menu", PAGINAS, key="pagina", label_visibility="collapsed")
 
     mensagem = st.session_state.pop("mensagem_sucesso", None)  # mostra uma vez só

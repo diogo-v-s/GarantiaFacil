@@ -73,3 +73,47 @@ lei 3/5. Tempo médio por caso: 25 s (máximo 63 s) na CPU.
    número de trechos, consulta da busca).
 5. Medir também a **qualidade do texto** (hoje só medimos roteamento e conteúdo), por exemplo com um
    segundo modelo como juiz, e a taxa de resposta inventada.
+
+## Citações e trechos na tela (28/10)
+
+O usuário pediu para esconder os "Trechos usados" e depois os marcadores `[1]`. Decisão e lição:
+
+- A tela não mostra mais os trechos nem os marcadores (`limpar_citacoes`, só na exibição; o texto
+  original continua guardado e a checagem de citações inventadas segue funcionando).
+- Só apagar os marcadores deixou frases sem sentido ("o trecho também menciona..."). A correção
+  foi no prompt: "só no fim da frase; nunca escreva a palavra 'trecho'". O modelo local então parou
+  de citar, e o texto saiu limpo. Efeito: a checagem de citação inventada quase nunca dispara agora.
+- Reavaliação parcial depois da mudança: lei 4/5 (antes 3/5), termo e sem termo 7/7. A rodada
+  completa ainda não foi refeita.
+- **Lição:** esconder informação da interface pode exigir mudar o que o modelo escreve, não só o que
+  a tela mostra.
+
+## Primeira rodada com o Claude (29/10/2026)
+
+Modelo: `claude-haiku-5-5`, mesma régua e mesma base (31 casos). Nota: **29/29 (100%)** contra 24/29
+(83%) do `llama3.2:3b`. Tempo médio por caso: 5 s (era 25 s na CPU).
+
+| Tipo | llama3.2:3b | claude-haiku-5-5 |
+|---|---|---|
+| cadastro | 10/11 | 11/11 |
+| lei | 3/5 | 5/5 |
+| termo | 4/4 | 4/4 |
+| sem termo | 3/3 | 3/3 |
+| esclarecimento | 2/2 | 2/2 |
+| contexto | 2/4 | 4/4 |
+
+Os opcionais `total_gasto` continuam falhando: a ferramenta ainda não existe (exercício do usuário).
+O Claude se virou com `listar_produtos` + `detalhes_produto` por produto, o que mostra o valor de ter
+uma ferramenta própria (menos chamadas e menos erro de soma).
+
+Cuidados: 100% **não** significa pronto. A régua tem 29 casos que o prompt já viu; ela já não separa
+bem um modelo bom de um ótimo. O próximo passo útil é o conjunto de teste separado, com casos novos.
+
+Bugs que só apareceram com a API real (o cliente falso não pegava):
+1. Os modelos Claude 5 e o SDK 2.x não aceitam `temperature`: removido de `ClaudeLlm`.
+2. A resposta pode trazer um bloco de raciocínio antes do texto: `perguntar` agora junta só os blocos
+   de texto, como `passo()` já fazia.
+
+**Trechos por provedor (29/10).** `trechos_por_resposta()` entrega 5 trechos com o Claude e 3 com o
+Ollama (`LLM_PROVIDER`). Rodada completa com 5 trechos no Claude: 29/29, 5 s por caso, igual a antes:
+a régua atual não distingue a diferença. O ganho só aparece num conjunto de teste separado.

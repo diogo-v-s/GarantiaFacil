@@ -151,7 +151,6 @@ class ClaudeLlm:
             model=self.modelo,
             max_tokens=1024,
             system=sistema or "",
-            temperature=0,
             tools=[
                 {
                     "name": "registrar_dados",
@@ -184,7 +183,6 @@ class ClaudeLlm:
             model=self.modelo,
             max_tokens=1024,
             system=sistema or "",
-            temperature=0,
             tools=[
                 {
                     "name": "registrar_dados",
@@ -220,19 +218,16 @@ class ClaudeLlm:
 
         client = anthropic.Anthropic()  # usa ANTHROPIC_API_KEY do ambiente
 
-        # Na API da Anthropic, a temperatura é um argumento direto (0 a 1)
-        extras = {}
-        if temperatura is not None:
-            extras["temperature"] = temperatura
-
+        # `temperatura` é ignorada: os modelos Claude 5 não aceitam esse parâmetro (o SDK 2.x
+        # nem o expõe). Só o Ollama a usa.
         resposta = client.messages.create(
             model=self.modelo,
             max_tokens=1024,
             system=sistema or "",
             messages=[{"role": "user", "content": prompt}],
-            **extras,
         )
-        return resposta.content[0].text
+        # O Claude 5 pode devolver blocos de raciocínio antes do texto: pega só os de texto.
+        return "".join(b.text for b in resposta.content if b.type == "text")
 
     def passo(self, mensagens: list[dict], ferramentas: list, sistema: str | None = None) -> PassoLlm:
         """Uma volta do agente com o Claude (tool use).
@@ -268,7 +263,6 @@ class ClaudeLlm:
             model=self.modelo,
             max_tokens=1024,
             system=sistema or "",
-            temperature=0,
             tools=[
                 {"name": f.nome, "description": f.descricao, "input_schema": f.schema()}
                 for f in ferramentas

@@ -19,7 +19,8 @@ NAO_ENCONTREI = "Não encontrei essa informação nos documentos."
 # manda recusar quando "nenhum trecho trata do assunto", respondeu certo.
 SISTEMA = (
     "Você ajuda a consultar termos de garantia. Responda à pergunta com base nos trechos "
-    "fornecidos, em português, de forma curta e direta, citando o número do trecho, como [1]. "
+    "fornecidos, em português, de forma curta e direta, citando o número do trecho, como [1], "
+    "só no fim da frase. Nunca escreva a palavra 'trecho' no texto da resposta. "
     "Cite apenas números de trechos que existem. "
     f"Só diga '{NAO_ENCONTREI}' se nenhum trecho tratar do assunto."
 )
@@ -48,6 +49,26 @@ def achar_citacoes_invalidas(texto: str, total_trechos: int) -> list[int]:
     Modelos inventam citações; por isso conferimos em vez de confiar."""
     citados = {int(n) for n in re.findall(r"\[(\d+)\]", texto)}
     return sorted(n for n in citados if not 1 <= n <= total_trechos)
+
+
+# "De acordo com o trecho [1]," / "Conforme os trechos [1] e [3]," — frase que só aponta para um
+# trecho que o usuário não vê.
+_FRASE_DE_TRECHO = (
+    r"(?:de acordo com|conforme|segundo|com base n[ao]s?|baseado n[ao]s?)\s+(?:o|os)\s+trechos?\s+"
+    r"\[\d+\](?:\s*(?:,|e)\s*\[\d+\])*\s*,?\s*"
+)
+_INICIO_DE_FRASE_COM_TRECHO = re.compile(r"(^|[.!?]\s+|\n)" + _FRASE_DE_TRECHO + r"(\S)", re.IGNORECASE)
+_FRASE_SOLTA_DE_TRECHO = re.compile(_FRASE_DE_TRECHO, re.IGNORECASE)
+_MARCADOR_DE_CITACAO = re.compile(r"\s*\[\d+\]")
+
+
+def limpar_citacoes(texto: str) -> str:
+    """O texto para mostrar ao usuário, sem os marcadores [1], [2]: ele não vê os trechos, então
+    eles viram ruído. O texto original continua guardado, pois a checagem de citações inventadas
+    precisa deles."""
+    texto = _INICIO_DE_FRASE_COM_TRECHO.sub(lambda m: m.group(1) + m.group(2).upper(), texto)
+    texto = _FRASE_SOLTA_DE_TRECHO.sub("", texto)
+    return _MARCADOR_DE_CITACAO.sub("", texto).strip()
 
 
 def montar_prompt(pergunta: str, trechos: list[TrechoEncontrado]) -> str:

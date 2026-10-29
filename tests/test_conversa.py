@@ -417,3 +417,57 @@ def test_sem_produto_em_discussao_a_busca_por_significado_ainda_vale(ambiente, m
     resposta = c.responder("o que a garantia do eletrodoméstico cobre?")
 
     assert resposta.produto.nome == "Geladeira Brastemp 375L"
+
+
+# ---------- regra para perguntas claramente de cadastro ----------
+
+
+@pytest.mark.parametrize(
+    "frase",
+    [
+        "quando vence a garantia do LP KODAK?",
+        "O que vence nos próximos 60 dias?",
+        "quais produtos já venceram a garantia?",
+        "quanto paguei no Xbox?",
+        "quando comprei a furadeira?",
+    ],
+)
+def test_frases_com_sinal_claro_de_cadastro_vao_para_o_agente_mesmo_se_o_classificador_erra(ambiente, frase):
+    from garantiafacil.agente import PassoLlm
+
+    repo, base, *_ = ambiente
+    llm = LlmFalso(sempre(True, "xbox"))  # o classificador "errou": disse produto
+    llm.passo = lambda mensagens, ferramentas, sistema=None: PassoLlm("Dados do cadastro.", [])
+    c = Conversa(repo, base, llm)
+
+    resposta = c.responder(frase)
+
+    assert resposta.texto == "Dados do cadastro."
+    assert llm.prompts == []  # não passou pelo RAG
+
+
+@pytest.mark.parametrize(
+    "frase",
+    [
+        "o que a garantia do notebook cobre?",
+        "posso reclamar se a garantia venceu?",
+        "o que diz a lei sobre garantia vencida?",
+        "a assistência atende depois que vence?",
+        "A garantia cobre tela quebrada?",
+    ],
+)
+def test_cobertura_lei_e_condicao_ficam_com_o_classificador(ambiente, frase):
+    from garantiafacil.conversa import _fala_do_cadastro
+
+    assert not _fala_do_cadastro(frase)
+
+
+def test_trechos_por_resposta_depende_do_provedor(monkeypatch):
+    from garantiafacil.conversa import trechos_por_resposta
+
+    monkeypatch.setenv("LLM_PROVIDER", "claude")
+    assert trechos_por_resposta() == 5
+    monkeypatch.setenv("LLM_PROVIDER", "ollama")
+    assert trechos_por_resposta() == 3
+    monkeypatch.delenv("LLM_PROVIDER")
+    assert trechos_por_resposta() == 3
