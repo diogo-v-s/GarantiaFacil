@@ -1,11 +1,12 @@
 """Imagens padrão dos produtos, usadas quando o usuário não envia uma foto.
 
-São ícones SVG (desenho em texto, sem arquivo de imagem), um por categoria. Produto sem
+São ícones SVG (desenho em texto, sem arquivo de imagem), um por categoria. O traço usa
+currentColor: a cor vem do CSS da tela, para acompanhar o tema claro ou escuro. Produto sem
 categoria usa a caixa."""
 
 from garantiafacil.modelos import Categoria
 
-_TRACO = 'fill="none" stroke="#2f45f5" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"'
+_TRACO = 'fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"'
 
 
 def _svg(desenho: str) -> str:

@@ -10,6 +10,7 @@ from garantiafacil.db import conectar
 from garantiafacil.ferramentas_cadastro import criar_ferramentas
 from garantiafacil.modelos import Categoria, Produto
 from garantiafacil.repositorio import Repositorio
+from tests.ajuda import banco_com_usuario
 
 HOJE = date(2026, 6, 1)
 
@@ -82,7 +83,7 @@ def test_agente_para_ao_estourar_o_maximo_de_passos():
 @pytest.fixture
 def repo(tmp_path):
     repo = Repositorio(
-        conectar(":memory:"), tmp_path, gerar_embedding=lambda *a, **k: None, nome_modelo=lambda: "f"
+        *banco_com_usuario(), tmp_path, gerar_embedding=lambda *a, **k: None, nome_modelo=lambda: "f"
     )
     repo._indexar = lambda produto: True  # sem embeddings nos testes
     cadastros = [

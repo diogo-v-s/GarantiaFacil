@@ -8,6 +8,7 @@ from garantiafacil.db import conectar
 from garantiafacil.modelos import Produto
 from garantiafacil.rag import BaseConhecimento
 from garantiafacil.repositorio import Repositorio
+from tests.ajuda import banco_com_usuario
 
 
 def embedding_falso(texto: str, consulta: bool = False) -> np.ndarray:
@@ -49,7 +50,7 @@ def novo(nome: str) -> Produto:
 def ambiente(tmp_path, monkeypatch):
     """Banco com 2 produtos, o CDC (geral) e o termo do Moto G60. Sem busca semântica de produto."""
     repo = Repositorio(
-        conectar(":memory:"), tmp_path, gerar_embedding=embedding_falso, nome_modelo=lambda: "f"
+        *banco_com_usuario(), tmp_path, gerar_embedding=embedding_falso, nome_modelo=lambda: "f"
     )
     monkeypatch.setattr(repo, "buscar_semantico", lambda *a, **k: [])
     moto = repo.adicionar(novo("MOTO G60 128GB - AZUL"))
@@ -197,7 +198,7 @@ def test_produto_sem_termo_avisa_que_usou_so_o_cdc(ambiente):
 
 def test_sem_produtos_cadastrados_responde_com_o_cdc_e_avisa(tmp_path):
     repo = Repositorio(
-        conectar(":memory:"), tmp_path, gerar_embedding=embedding_falso, nome_modelo=lambda: "f"
+        *banco_com_usuario(), tmp_path, gerar_embedding=embedding_falso, nome_modelo=lambda: "f"
     )
     base = BaseConhecimento(repo.conexao, embedding_falso, lambda: "f")
     base.indexar("cdc.txt", [(1, "O prazo é de 90 dias.")])

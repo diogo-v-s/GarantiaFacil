@@ -19,6 +19,13 @@ class Categoria(str, Enum):
     OUTROS = "Outros"  # o que não se encaixa nas demais
 
 
+class TipoPessoa(str, Enum):
+    """Quem é o usuário: pessoa física (CPF) ou jurídica (CNPJ). O valor vai para o banco."""
+
+    FISICA = "Pessoa física"
+    JURIDICA = "Pessoa jurídica"
+
+
 class TipoDocumento(str, Enum):
     """Tipos de documento guardados em um produto. Termo e manual também alimentam as
     respostas da aba Perguntas; a nota fiscal só fica guardada."""

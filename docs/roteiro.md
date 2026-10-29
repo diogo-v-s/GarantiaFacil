@@ -10,4 +10,35 @@ Marque cada etapa ao concluir. Em cada uma: conceito, código feito junto e um e
 - [x] **5. RAG em manuais e termos de garantia** — chunking, banco vetorial (Chroma), respostas com fonte.
 - [x] **6. Agente de garantia** — tool use: consultar produtos, calcular prazo, montar alerta de vencimento.
 - [x] **7. Avaliação** — conjunto de testes, medir acerto, custo e latência, melhorar.
-- [ ] **8. Extras** — interface web, notificações, servidor MCP próprio.
+- [x] **8. Usuários e experiência** — login (e-mail e senha), perfil PF/PJ com CPF/CNPJ validado,
+      dados separados por usuário, cadastro de várias notas, foto pela câmera do celular, painel
+      com gasto por categoria e linha do tempo, tema escuro, estado vazio e primeiro acesso.
+      - [x] Data vazia na leitura da nota (a IA devolvia a data com hora; agora lê e avisa)
+      - [x] Login e dados por usuário (e-mail e senha com hash scrypt; produtos de antes do login
+            ficam sem dono e invisíveis; backup em `data/backup-antes-do-login/`)
+      - [x] Perfil PF/PJ (CPF/CNPJ validado pelo dígito verificador; tela Editar perfil no menu do
+            usuário, que fica fixo no rodapé da barra lateral)
+      - [x] Manter conectado (token aleatório em cookie, só o hash no banco, 30 dias)
+      - [x] Várias notas de uma vez (cada arquivo é uma nota; a IA lê todas e você confere e salva
+            uma por vez, ou pula)
+      - [x] Painel (total investido, gasto por categoria, vencimentos nos próximos 12 meses e o que
+            perde a garantia em 90 dias)
+      - [x] Primeiro acesso (boas-vindas com 3 passos) e estados vazios (lista filtrada, painel e
+            chat com perguntas de exemplo clicáveis)
+      - [x] Tema escuro (claro e escuro no config.toml; o usuário troca no menu ⋮; nossas cores
+            seguem o tema ativo)
+      - [x] Foto do produto pela câmera (ou arquivo), no cadastro e nos detalhes do produto
+- [ ] **9. O app trabalha por você** — avisos de vencimento (e-mail/WhatsApp), garantia do
+      fabricante somada à legal, termo em PDF sugerindo o prazo.
+- [ ] **10. Chat mais esperto** — chat que age (lembretes, cadastro com confirmação), testar tirar o
+      classificador, conjunto de teste separado, servidor MCP próprio.
+- [ ] **11. Deploy** — publicar online, login com Google, banco e arquivos fora da máquina, backup.
+
+Decisões da etapa 8 (29/10/2026): login por e-mail e senha agora e Google só no deploy; perfil
+básico com CPF/CNPJ validado, sem endereço; produtos atuais ficam de fora (começa do zero); o perfil
+por enquanto só tem tela própria, sem conferir o destinatário da nota.
+
+Limites conhecidos do login (para a etapa 11): sem "Manter conectado", recarregar a página desloga;
+não há limite de tentativas de senha nem recuperação de senha; o e-mail não é confirmado; o cookie
+não é HttpOnly (o Streamlit só grava cookie por JavaScript) e só ganha o selo Secure em https.
+O login com Google do deploy resolve a sessão e a senha.

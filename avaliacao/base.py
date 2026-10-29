@@ -11,6 +11,7 @@ from garantiafacil.documentos import extrair_paginas
 from garantiafacil.modelos import Categoria, Produto
 from garantiafacil.rag import BaseConhecimento
 from garantiafacil.repositorio import Repositorio
+from garantiafacil.usuarios import Usuarios
 
 # Os vencimentos dependem da data: a avaliação fixa "hoje" para os resultados se repetirem.
 HOJE = date(2026, 10, 28)
@@ -29,9 +30,23 @@ PRODUTOS = [
 ]  # fmt: skip
 
 
+EMAIL_AVALIACAO = "avaliacao@taguardado.local"
+
+
+def _usuario_da_avaliacao(conexao) -> int:
+    """A base de avaliação tem um usuário só dela. Produtos de antes do login (sem dono) são
+    entregues a ele, para a base antiga continuar valendo."""
+    linha = conexao.execute("SELECT id FROM usuarios WHERE email = ?", (EMAIL_AVALIACAO,)).fetchone()
+    usuario_id = linha["id"] if linha else Usuarios(conexao).criar(EMAIL_AVALIACAO, "senha-da-avaliacao", "Avaliação").id
+    conexao.execute("UPDATE produtos SET usuario_id = ? WHERE usuario_id IS NULL", (usuario_id,))
+    conexao.commit()
+    return usuario_id
+
+
 def montar(caminho: Path = CAMINHO_BANCO) -> tuple[Repositorio, BaseConhecimento]:
     """Abre (e completa, se faltar algo) a base de avaliação."""
-    repo = Repositorio(conectar(caminho, check_same_thread=False))
+    conexao = conectar(caminho, check_same_thread=False)
+    repo = Repositorio(conexao, _usuario_da_avaliacao(conexao))
     base = BaseConhecimento(repo.conexao)
 
     if not repo.listar():

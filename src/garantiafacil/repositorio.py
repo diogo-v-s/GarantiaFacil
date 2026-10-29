@@ -32,14 +32,19 @@ def _texto_para_indexar(produto: Produto) -> str:
 
 
 class Repositorio:
+    """Dados de UM usuário: toda consulta filtra por `usuario_id`, então um usuário nunca vê,
+    altera nem apaga o produto de outro, mesmo conhecendo o id dele."""
+
     def __init__(
         self,
         conexao: sqlite3.Connection,
+        usuario_id: int,
         pasta_comprovantes: Path = PASTA_DADOS / "comprovantes",
         gerar_embedding=embeddings.gerar_embedding,
         nome_modelo=embeddings.nome_modelo,
     ):
         self.conexao = conexao
+        self.usuario_id = usuario_id
         self.pasta_comprovantes = Path(pasta_comprovantes)
         self._gerar_embedding = gerar_embedding  # injetável: os testes usam um embedding falso
         self._nome_modelo = nome_modelo
@@ -50,8 +55,8 @@ class Repositorio:
         # Os "?" evitam SQL injection: nunca monte SQL concatenando texto do usuário.
         cursor = self.conexao.execute(
             "INSERT INTO produtos "
-            "(nome, loja, data_compra, prazo_garantia_meses, valor, observacoes, categoria) "
-            "VALUES (?, ?, ?, ?, ?, ?, ?)",  # a foto é salva à parte, em salvar_foto()
+            "(nome, loja, data_compra, prazo_garantia_meses, valor, observacoes, categoria, usuario_id) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",  # a foto é salva à parte, em salvar_foto()
             (
                 produto.nome,
                 produto.loja,
@@ -60,6 +65,7 @@ class Repositorio:
                 produto.valor,
                 produto.observacoes,
                 produto.categoria.value if produto.categoria else None,
+                self.usuario_id,
             ),
         )
         self.conexao.commit()
@@ -69,18 +75,21 @@ class Repositorio:
 
     def obter(self, produto_id: int) -> Produto | None:
         linha = self.conexao.execute(
-            "SELECT * FROM produtos WHERE id = ?", (produto_id,)
+            "SELECT * FROM produtos WHERE id = ? AND usuario_id = ?", (produto_id, self.usuario_id)
         ).fetchone()
         return _linha_para_produto(linha) if linha else None
 
     def listar(self) -> list[Produto]:
-        linhas = self.conexao.execute("SELECT * FROM produtos ORDER BY data_compra DESC").fetchall()
+        linhas = self.conexao.execute(
+            "SELECT * FROM produtos WHERE usuario_id = ? ORDER BY data_compra DESC",
+            (self.usuario_id,),
+        ).fetchall()
         return [_linha_para_produto(linha) for linha in linhas]
 
     def atualizar_categoria(self, produto_id: int, categoria: Categoria | None) -> None:
         self.conexao.execute(
-            "UPDATE produtos SET categoria = ? WHERE id = ?",
-            (categoria.value if categoria else None, produto_id),
+            "UPDATE produtos SET categoria = ? WHERE id = ? AND usuario_id = ?",
+            (categoria.value if categoria else None, produto_id, self.usuario_id),
         )
         self.conexao.commit()
 
@@ -91,9 +100,9 @@ class Repositorio:
         padrao = f"%{texto.strip()}%"
         linhas = self.conexao.execute(
             "SELECT * FROM produtos "
-            "WHERE nome LIKE ? OR loja LIKE ? OR observacoes LIKE ? "
+            "WHERE usuario_id = ? AND (nome LIKE ? OR loja LIKE ? OR observacoes LIKE ?) "
             "ORDER BY data_compra DESC",
-            (padrao, padrao, padrao),
+            (self.usuario_id, padrao, padrao, padrao),
         ).fetchall()
         return [_linha_para_produto(linha) for linha in linhas]
 
@@ -118,8 +127,8 @@ class Repositorio:
         Devolve quantos foram indexados."""
         linhas = self.conexao.execute(
             "SELECT p.* FROM produtos p LEFT JOIN embeddings e ON e.produto_id = p.id "
-            "WHERE e.produto_id IS NULL OR e.modelo != ?",
-            (self._nome_modelo(),),
+            "WHERE p.usuario_id = ? AND (e.produto_id IS NULL OR e.modelo != ?)",
+            (self.usuario_id, self._nome_modelo()),
         ).fetchall()
         return sum(self._indexar(_linha_para_produto(linha)) for linha in linhas)
 
@@ -136,8 +145,8 @@ class Repositorio:
 
         linhas = self.conexao.execute(
             "SELECT p.*, e.vetor FROM produtos p JOIN embeddings e ON e.produto_id = p.id "
-            "WHERE e.modelo = ?",
-            (self._nome_modelo(),),
+            "WHERE p.usuario_id = ? AND e.modelo = ?",
+            (self.usuario_id, self._nome_modelo()),
         ).fetchall()
 
         resultados = []
@@ -152,8 +161,8 @@ class Repositorio:
 
     def salvar_foto(self, produto_id: int, nome_original: str, conteudo: bytes) -> str:
         """Guarda a foto do produto (troca a anterior, se houver) e devolve o caminho."""
-        produto = self.obter(produto_id)
-        if produto and produto.foto:
+        produto = self._produto_do_usuario(produto_id)
+        if produto.foto:
             Path(produto.foto).unlink(missing_ok=True)
 
         pasta = self.pasta_comprovantes / str(produto_id)
@@ -161,18 +170,31 @@ class Repositorio:
         caminho = pasta / f"foto_{uuid.uuid4().hex[:8]}_{Path(nome_original).name}"
         caminho.write_bytes(conteudo)
 
-        self.conexao.execute("UPDATE produtos SET foto = ? WHERE id = ?", (str(caminho), produto_id))
+        self.conexao.execute("UPDATE produtos SET foto = ? WHERE id = ?", (str(caminho), produto.id))
         self.conexao.commit()
         return str(caminho)
 
     def excluir(self, produto_id: int) -> None:
+        produto = self.obter(produto_id)
+        if produto is None:  # não existe ou é de outro usuário: não há o que apagar
+            return
         for comprovante in self.listar_comprovantes(produto_id):
             Path(comprovante.caminho).unlink(missing_ok=True)
-        produto = self.obter(produto_id)
-        if produto and produto.foto:
+        if produto.foto:
             Path(produto.foto).unlink(missing_ok=True)
         self.conexao.execute("DELETE FROM produtos WHERE id = ?", (produto_id,))
         self.conexao.commit()
+        try:  # a pasta do produto ficou vazia: some junto
+            (self.pasta_comprovantes / str(produto_id)).rmdir()
+        except OSError:  # não existe, ou ainda tem algo dentro: deixa quieta
+            pass
+
+    def _produto_do_usuario(self, produto_id: int) -> Produto:
+        """Para operações que mexem num produto pelo id: recusa o de outro usuário."""
+        produto = self.obter(produto_id)
+        if produto is None:
+            raise LookupError(f"Produto {produto_id} não encontrado")
+        return produto
 
     # ---------- comprovantes ----------
 
@@ -183,6 +205,7 @@ class Repositorio:
         conteudo: bytes,
         tipo: TipoDocumento = TipoDocumento.NOTA_FISCAL,
     ) -> Comprovante:
+        self._produto_do_usuario(produto_id)
         pasta = self.pasta_comprovantes / str(produto_id)
         pasta.mkdir(parents=True, exist_ok=True)
 
@@ -206,6 +229,8 @@ class Repositorio:
         )
 
     def listar_comprovantes(self, produto_id: int) -> list[Comprovante]:
+        if self.obter(produto_id) is None:
+            return []
         linhas = self.conexao.execute(
             "SELECT * FROM comprovantes WHERE produto_id = ? ORDER BY id", (produto_id,)
         ).fetchall()

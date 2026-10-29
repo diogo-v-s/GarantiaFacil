@@ -75,6 +75,10 @@ def ler_nota(
             "Chave de acesso não encontrada (QR code ilegível ou cortado e a leitura do texto "
             "falhou): todos os dados vêm só da IA. Confira com atenção."
         )
+        if resultado.data_compra is None:
+            resultado.avisos.append(
+                "Não consegui ler a data da compra: o campo mostra a data de hoje. Informe a correta."
+            )
         return resultado
     resultado.avisos.append(f"Chave de acesso lida {origem_chave}.")
 

@@ -5,8 +5,9 @@ import numpy as np
 import pytest
 
 from garantiafacil.db import conectar
-from garantiafacil.modelos import Produto
+from garantiafacil.modelos import Categoria, Produto
 from garantiafacil.repositorio import Repositorio
+from tests.ajuda import adotar_orfaos, banco_com_usuario
 
 
 def embedding_falso(texto: str, consulta: bool = False) -> np.ndarray:
@@ -24,7 +25,7 @@ def embedding_falso(texto: str, consulta: bool = False) -> np.ndarray:
 def repo(tmp_path):
     """Repositório novo para cada teste: banco em memória e comprovantes numa pasta temporária."""
     return Repositorio(
-        conectar(":memory:"),
+        *banco_com_usuario(),
         pasta_comprovantes=tmp_path / "comprovantes",
         gerar_embedding=embedding_falso,
         nome_modelo=lambda: "falso",
@@ -145,7 +146,7 @@ def test_produto_e_salvo_mesmo_se_o_embedding_falhar(tmp_path):
         raise ConnectionError("Ollama fora do ar")
 
     repo = Repositorio(
-        conectar(":memory:"),
+        *banco_com_usuario(),
         pasta_comprovantes=tmp_path,
         gerar_embedding=quebrado,
         nome_modelo=lambda: "falso",
@@ -166,7 +167,7 @@ def test_reindexar_completa_o_que_faltou(tmp_path):
         return embedding_falso(texto, consulta)
 
     repo = Repositorio(
-        conectar(":memory:"),
+        *banco_com_usuario(),
         pasta_comprovantes=tmp_path,
         gerar_embedding=instavel,
         nome_modelo=lambda: "falso",
@@ -183,7 +184,7 @@ def test_reindexar_completa_o_que_faltou(tmp_path):
 def test_reindexar_refaz_quando_o_modelo_muda(tmp_path):
     modelo = {"nome": "modelo-a"}
     repo = Repositorio(
-        conectar(":memory:"),
+        *banco_com_usuario(),
         pasta_comprovantes=tmp_path,
         gerar_embedding=embedding_falso,
         nome_modelo=lambda: modelo["nome"],
@@ -249,7 +250,8 @@ def test_banco_antigo_sem_coluna_categoria_e_migrado(tmp_path):
     antigo.commit()
     antigo.close()
 
-    repo = Repositorio(conectar(caminho), gerar_embedding=embedding_falso, nome_modelo=lambda: "f")
+    repo = Repositorio(*banco_com_usuario(caminho), gerar_embedding=embedding_falso, nome_modelo=lambda: "f")
+    adotar_orfaos(repo)
 
     [produto] = repo.listar()
     assert produto.nome == "Xbox" and produto.categoria is None
@@ -323,7 +325,8 @@ def test_banco_antigo_com_comprovantes_sem_tipo_e_migrado(tmp_path):
     antigo.commit()
     antigo.close()
 
-    repo = Repositorio(conectar(caminho), gerar_embedding=embedding_falso, nome_modelo=lambda: "f")
+    repo = Repositorio(*banco_com_usuario(caminho), gerar_embedding=embedding_falso, nome_modelo=lambda: "f")
+    adotar_orfaos(repo)
 
     assert repo.listar()[0].foto is None
     assert repo.listar_comprovantes(1)[0].tipo is TipoDocumento.NOTA_FISCAL
@@ -353,7 +356,8 @@ def test_banco_com_regra_antiga_de_categorias_e_reconstruido_sem_perder_dados(tm
     antigo.commit()
     antigo.close()
 
-    repo = Repositorio(conectar(caminho), gerar_embedding=embedding_falso, nome_modelo=lambda: "f")
+    repo = Repositorio(*banco_com_usuario(caminho), gerar_embedding=embedding_falso, nome_modelo=lambda: "f")
+    adotar_orfaos(repo)
 
     furadeira = repo.obter(1)
     assert furadeira.categoria is Categoria.FERRAMENTAS and furadeira.foto == "f.jpg"
@@ -374,3 +378,72 @@ def test_reconstruir_so_acontece_uma_vez(tmp_path):
     conexao = conectar(caminho)  # segunda abertura: a regra já está atual, nada a refazer
 
     assert conexao.execute("SELECT name FROM sqlite_master WHERE name = 'produtos_novo'").fetchone() is None
+
+
+# ---------- dados separados por usuário ----------
+
+
+def dois_repositorios(tmp_path):
+    """Dois usuários no MESMO banco, cada um com o seu repositório."""
+    from garantiafacil.usuarios import Usuarios
+
+    conexao, ana = banco_com_usuario(email="ana@exemplo.com")
+    bia = Usuarios(conexao).criar("bia@exemplo.com", "senha-de-teste", "Bia").id
+    base = dict(pasta_comprovantes=tmp_path, gerar_embedding=embedding_falso, nome_modelo=lambda: "f")
+    return Repositorio(conexao, ana, **base), Repositorio(conexao, bia, **base)
+
+
+def test_cada_usuario_ve_so_os_proprios_produtos(tmp_path):
+    ana, bia = dois_repositorios(tmp_path)
+    produto_da_ana = ana.adicionar(novo_produto("Geladeira da Ana"))
+    bia.adicionar(novo_produto("Notebook da Bia"))
+
+    assert [p.nome for p in ana.listar()] == ["Geladeira da Ana"]
+    assert [p.nome for p in bia.listar()] == ["Notebook da Bia"]
+    assert bia.obter(produto_da_ana.id) is None  # nem pelo id
+    assert bia.buscar("Geladeira") == []
+    nomes_semantico = [p.nome for p, _ in bia.buscar_semantico("geladeira", minimo=0.0)]
+    assert "Geladeira da Ana" not in nomes_semantico  # minimo=0 devolve tudo que ela tem
+
+
+def test_usuario_nao_altera_nem_apaga_produto_de_outro(tmp_path):
+    ana, bia = dois_repositorios(tmp_path)
+    produto = ana.adicionar(novo_produto("Geladeira da Ana"))
+
+    bia.atualizar_categoria(produto.id, Categoria.FERRAMENTAS)
+    bia.excluir(produto.id)
+
+    assert ana.obter(produto.id) is not None
+    assert ana.obter(produto.id).categoria is None
+
+
+def test_usuario_nao_anexa_arquivo_em_produto_de_outro(tmp_path):
+    ana, bia = dois_repositorios(tmp_path)
+    produto = ana.adicionar(novo_produto())
+
+    with pytest.raises(LookupError):
+        bia.adicionar_comprovante(produto.id, "nota.pdf", b"x")
+    with pytest.raises(LookupError):
+        bia.salvar_foto(produto.id, "foto.png", b"x")
+    assert bia.listar_comprovantes(produto.id) == []
+
+
+def test_produto_sem_dono_nao_aparece_para_ninguem(repo):
+    repo.conexao.execute(
+        "INSERT INTO produtos (nome, loja, data_compra, prazo_garantia_meses) "
+        "VALUES ('Antigo', 'Loja', '2026-01-01', 12)"
+    )
+    repo.conexao.commit()
+
+    assert repo.listar() == [] and repo.buscar("Antigo") == []
+
+
+def test_excluir_remove_a_pasta_do_produto(repo, tmp_path):
+    produto = repo.adicionar(novo_produto())
+    repo.adicionar_comprovante(produto.id, "nota.pdf", b"x")
+    pasta = tmp_path / "comprovantes" / str(produto.id)
+    assert pasta.exists()
+
+    repo.excluir(produto.id)
+
+    assert not pasta.exists()

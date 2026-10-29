@@ -1,10 +1,18 @@
 [theme]
-base = "light"
+font = "sans serif"
+
+# Dois temas. O Streamlit escolhe pelo tema do sistema e guarda a escolha do usuário no navegador.
+[theme.light]
 primaryColor = "#2f45f5"
 backgroundColor = "#f7f9ff"
 secondaryBackgroundColor = "#ffffff"
 textColor = "#16193a"
-font = "sans serif"
+
+[theme.dark]
+primaryColor = "#5468ff"
+backgroundColor = "#0f1224"
+secondaryBackgroundColor = "#1a1e38"
+textColor = "#e8eaf6"
 
 [server]
 headless = true

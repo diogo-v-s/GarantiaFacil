@@ -174,3 +174,10 @@ def test_detalhes_e_categoria_da_ia_vao_para_o_resultado():
     assert resultado.produto == "Smartphone Moto E13"
     assert resultado.detalhes == "Vermelho, 64GB"
     assert resultado.categoria.value == "Eletrônicos"
+
+
+def test_data_ilegivel_sem_chave_avisa_que_usa_a_de_hoje():
+    r = ler_nota(b"x", llm=ia(data_compra="ontem"), ler_chave=sem_qr)
+
+    assert r.data_compra is None
+    assert any("data da compra" in a for a in r.avisos)

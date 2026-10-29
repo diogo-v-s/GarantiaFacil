@@ -1,5 +1,6 @@
 """Extração de dados de uma foto de nota fiscal usando um LLM com visão."""
 
+import re
 from datetime import date, datetime
 from typing import Literal
 
@@ -50,11 +51,15 @@ class DadosNota(BaseModel):
     def data(self) -> date | None:
         """Converte o texto da data para `date`; None se o modelo devolveu algo inválido.
 
-        Aceita AAAA-MM-DD e DD/MM/AAAA (o formato usado nas notas brasileiras)."""
+        Aceita DD/MM/AAAA (o formato das notas brasileiras) e AAAA-MM-DD, com ou sem hora
+        depois ("30/09/2026 17:15:41"): procura a data dentro do texto."""
         texto = self.data_compra.strip()
-        for formato in ("%d/%m/%Y", "%Y-%m-%d"):
+        for padrao, formato in ((r"\d{2}/\d{2}/\d{4}", "%d/%m/%Y"), (r"\d{4}-\d{2}-\d{2}", "%Y-%m-%d")):
+            achado = re.search(padrao, texto)
+            if not achado:
+                continue
             try:
-                return datetime.strptime(texto, formato).date()
+                return datetime.strptime(achado.group(), formato).date()
             except ValueError:
                 continue
         return None

@@ -41,6 +41,11 @@ def test_data_no_formato_brasileiro():
     assert dados(data_compra="12/08/2026").data() == date(2026, 8, 12)
 
 
+def test_data_com_hora_depois():
+    assert dados(data_compra="30/09/2026 17:15:41").data() == date(2026, 9, 30)
+    assert dados(data_compra="2026-09-30T17:15:41").data() == date(2026, 9, 30)
+
+
 def test_data_invalida_vira_none():
     assert dados(data_compra="2026-13-45").data() is None
     assert dados(data_compra="ontem").data() is None

@@ -11,6 +11,7 @@ __pycache__/
 # Dados locais (banco, comprovantes, índice vetorial)
 data/*.db
 data/chroma/
+data/backup-*/
 data/comprovantes/*
 !data/comprovantes/.gitkeep
 
