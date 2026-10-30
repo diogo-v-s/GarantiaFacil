@@ -93,6 +93,16 @@ class Repositorio:
         )
         self.conexao.commit()
 
+    def atualizar_prazo(self, produto_id: int, meses: int) -> None:
+        """Muda o prazo de garantia (em meses) de um produto do usuário."""
+        if not 1 <= meses <= 120:  # os mesmos limites do campo do cadastro
+            raise ValueError("O prazo de garantia deve ficar entre 1 e 120 meses.")
+        self.conexao.execute(
+            "UPDATE produtos SET prazo_garantia_meses = ? WHERE id = ? AND usuario_id = ?",
+            (meses, produto_id, self.usuario_id),
+        )
+        self.conexao.commit()
+
     def buscar(self, texto: str) -> list[Produto]:
         """Busca por palavra no nome, loja ou observações (LIKE).
         Limitação: só acha o texto literal. 'geladeira' não acha 'refrigerador'.

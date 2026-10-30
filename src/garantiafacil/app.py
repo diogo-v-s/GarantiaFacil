@@ -6,6 +6,7 @@ Rode com: uv run streamlit run src/garantiafacil/app.py
 import base64
 import html
 import threading
+from dataclasses import replace
 from datetime import date
 from pathlib import Path
 
@@ -19,11 +20,14 @@ from garantiafacil.documentos import extrair_paginas
 from garantiafacil.fotos import ARQUIVO, CAMERA, ORIGENS, SEM_FOTO, foto_escolhida
 from garantiafacil.garantia import (
     DIAS_ALERTA,
+    GARANTIA_LEGAL_DIAS,
     contar_por_status,
     data_vencimento,
     dias_restantes,
+    fim_garantia_fabricante,
     status_garantia,
 )
+from garantiafacil.avisos import OPCOES_DIAS, avisos_de_vencimento, quando
 from garantiafacil.cpf_cnpj import formatar_cnpj, formatar_cpf, formatar_telefone
 from garantiafacil.llm import criar_llm
 from garantiafacil.imagens import imagem_padrao
@@ -37,6 +41,7 @@ from garantiafacil.painel import (
     vencimentos_por_mes,
 )
 from garantiafacil.pipeline_nota import ler_nota
+from garantiafacil.prazo_termo import sugerir_prazo
 from garantiafacil.rag import BaseConhecimento, limpar_citacoes
 from garantiafacil.repositorio import Repositorio
 from garantiafacil.usuarios import DURACAO_SESSAO_DIAS, ErroDeCadastro, Usuarios
@@ -189,6 +194,7 @@ ESTILO = """
 .linha-vencimento .quando { border-radius: 999px; padding: 4px 12px; font-size: 0.82rem; font-weight: 600; white-space: nowrap; }
 .quando.ok { background: var(--ok-bg); color: var(--ok); }
 .quando.aviso { background: var(--aviso-bg); color: var(--aviso); }
+.quando.urgente { background: var(--erro-bg); color: var(--erro); }
 
 /* estados vazios e primeiro acesso */
 .vazio {
@@ -278,15 +284,23 @@ def _definir_cookie(valor: str, dias: int):
     )
 
 
+def _abrir_preferencias():
+    st.session_state.pop("tela_perfil", None)
+    st.session_state["tela_preferencias"] = True
+    st.session_state["pagina"] = None  # menu sem item marcado (mesmo motivo do perfil, abaixo)
+
+
 def _abrir_perfil():
+    st.session_state.pop("tela_preferencias", None)
     st.session_state["tela_perfil"] = True
     # Menu sem item marcado enquanto o perfil está aberto: o Streamlit só avisa quando a seleção
     # MUDA, e clicar no item que já estava marcado não faria nada (o usuário ficaria preso no perfil).
     st.session_state["pagina"] = None
 
 
-def _fechar_perfil():
+def _fechar_tela_da_conta():
     st.session_state.pop("tela_perfil", None)
+    st.session_state.pop("tela_preferencias", None)
 
 
 def _logo_html(largura: int) -> str:
@@ -410,9 +424,33 @@ def tela_perfil(usuarios: Usuarios, usuario):
     st.rerun()
 
 
+def tela_preferencias(usuarios: Usuarios, usuario):
+    """Preferências do usuário. Por enquanto: com quanta antecedência avisar dos vencimentos."""
+    cabecalho("Preferências", "Ajuste o app do seu jeito.")
+    with st.form("preferencias"):
+        st.markdown("**Avisos de vencimento**")
+        dias = st.multiselect(
+            "Avisar quando faltarem",
+            OPCOES_DIAS,
+            default=[d for d in usuario.avisar_dias if d in OPCOES_DIAS],
+            format_func=lambda d: f"{d} dia" if d == 1 else f"{d} dias",
+            help="A faixa de avisos da página Meus produtos mostra as garantias que vencem dentro da "
+            "maior antecedência escolhida, e destaca em vermelho as que entraram na menor.",
+        )
+        st.caption("Sem nenhuma escolha, o app não mostra avisos.")
+        enviado = st.form_submit_button("Salvar preferências", type="primary")
+    st.caption("🌓 O tema (claro ou escuro) se troca no menu ⋮, no canto superior direito da tela.")
+
+    if not enviado:
+        return
+    st.session_state["usuario"] = usuarios.atualizar_avisos(usuario.id, dias)
+    st.session_state["mensagem_sucesso"] = "Preferências salvas."
+    st.rerun()
+
+
 def _ir_para(pagina: str):
     st.session_state["pagina"] = pagina
-    st.session_state.pop("tela_perfil", None)  # sai da tela de perfil, se estava nela
+    _fechar_tela_da_conta()  # sai do perfil ou das preferências, se estava numa delas
 
 
 def cabecalho(titulo: str, subtitulo: str):
@@ -587,6 +625,49 @@ def tela_cadastro(repo: Repositorio):
     _concluir_cadastro(salvos)
 
 
+def _ler_prazo_do_termo(produto: Produto, paginas: list[tuple[int, str]]) -> str:
+    """Pede à IA o prazo de garantia que o termo informa. Se for diferente do cadastro, guarda a
+    sugestão para a tela de detalhes. Devolve um texto para o aviso depois do upload."""
+    try:
+        with st.spinner("Lendo o prazo de garantia do termo..."):
+            sugestao = sugerir_prazo(paginas)
+    except Exception:  # IA fora do ar etc.: o prazo é um extra, o termo continua guardado
+        return ""
+    if sugestao is None:
+        return " Não encontrei o prazo de garantia no termo."
+    if sugestao.meses == produto.prazo_garantia_meses:
+        return f" O prazo do termo ({sugestao.meses} meses) confere com o cadastro."
+    st.session_state[f"sugestao_prazo_{produto.id}"] = sugestao
+    return (
+        f" O termo informa {sugestao.meses} meses e o cadastro tem {produto.prazo_garantia_meses}: "
+        "veja a sugestão nos detalhes do produto."
+    )
+
+
+def _sugestao_de_prazo(repo: Repositorio, produto: Produto):
+    """Caixa 'o termo diz X meses, usar?' dos detalhes do produto (só se houver sugestão)."""
+    chave = f"sugestao_prazo_{produto.id}"
+    sugestao = st.session_state.get(chave)
+    if sugestao is None:
+        return
+    if sugestao.meses == produto.prazo_garantia_meses:  # já aplicado (ou igual): some
+        st.session_state.pop(chave, None)
+        return
+    novo_vencimento = data_vencimento(replace(produto, prazo_garantia_meses=sugestao.meses))
+    with st.container(border=True):
+        st.markdown(f"💡 **O termo de garantia informa {sugestao.meses} meses** (o cadastro tem {produto.prazo_garantia_meses}).")
+        st.caption(f"“{sugestao.trecho}”")
+        st.caption(f"Com {sugestao.meses} meses, a garantia passa a vencer em {formatar_data(novo_vencimento)}.")
+        coluna_usar, coluna_ignorar, _ = st.columns([1.6, 1, 3])
+        if coluna_usar.button(f"Usar {sugestao.meses} meses", key=f"usar_prazo_{produto.id}", type="primary"):
+            repo.atualizar_prazo(produto.id, sugestao.meses)
+            st.session_state.pop(chave, None)
+            st.rerun()
+        if coluna_ignorar.button("Ignorar", key=f"ignorar_prazo_{produto.id}"):
+            st.session_state.pop(chave, None)
+            st.rerun()
+
+
 def guardar_documento(repo: Repositorio, base: BaseConhecimento, produto: Produto, arquivo, tipo):
     """Guarda o arquivo e, se for termo ou manual com texto, indexa para a aba Perguntas."""
     aviso = ""
@@ -600,6 +681,8 @@ def guardar_documento(repo: Repositorio, base: BaseConhecimento, produto: Produt
             except Exception as erro:  # Ollama fora do ar, modelo não baixado...
                 st.error(f"Não consegui indexar, o documento não foi guardado: {erro}")
                 return
+            if tipo == TipoDocumento.TERMO_GARANTIA:
+                aviso += _ler_prazo_do_termo(produto, paginas)
         else:
             aviso = " Não achei texto nele, então não será usado nas respostas (só PDF com texto ou .txt)."
 
@@ -616,10 +699,16 @@ def mostrar_detalhes(repo: Repositorio, base: BaseConhecimento, produto: Produto
         st.write(f"**Restam:** {dias} dias")
     else:
         st.write(f"**Venceu há:** {-dias} dias")
+    st.caption(
+        f"Garantia do fabricante: {produto.prazo_garantia_meses} meses, até "
+        f"{formatar_data(fim_garantia_fabricante(produto))}. Depois dela, a garantia legal do CDC "
+        f"({GARANTIA_LEGAL_DIAS} dias) segue valendo até {formatar_data(data_vencimento(produto))}."
+    )
     if produto.valor:
         st.write(f"**Valor:** R$ {produto.valor:,.2f}")
     if produto.observacoes:
         st.write(f"**Observações:** {produto.observacoes}")
+    _sugestao_de_prazo(repo, produto)
 
     nova_categoria = st.selectbox(
         "Categoria",
@@ -815,6 +904,33 @@ def tela_boas_vindas(usuario):
             )  # fmt: skip
 
 
+MAXIMO_NA_FAIXA = 5
+
+
+def faixa_de_avisos(produtos: list[Produto], usuario):
+    """Garantias perto do fim, conforme a antecedência escolhida nas Preferências."""
+    avisos = avisos_de_vencimento(produtos, date.today(), usuario.avisar_dias)
+    if not avisos:
+        return
+    with st.container(border=True):
+        st.markdown(
+            f'<div class="titulo-secao">🔔 Garantias para ficar de olho ({len(avisos)})</div>'
+            f'<div class="sub-secao">Vencem em até {max(usuario.avisar_dias)} dias</div>',
+            unsafe_allow_html=True,
+        )
+        for aviso in avisos[:MAXIMO_NA_FAIXA]:
+            classe = "urgente" if aviso.urgente else "aviso"
+            st.markdown(
+                f'<div class="linha-vencimento"><div><span class="nome-produto">{html.escape(aviso.produto.nome)}</span>'
+                f'<div class="loja-produto">{html.escape(aviso.produto.loja)} · vence em {formatar_data(aviso.vencimento)}</div></div>'
+                f'<span class="quando {classe}">{quando(aviso.dias)}</span></div>',
+                unsafe_allow_html=True,
+            )
+        if len(avisos) > MAXIMO_NA_FAIXA:
+            st.caption(f"…e mais {len(avisos) - MAXIMO_NA_FAIXA}. Veja todas no Painel.")
+    st.write("")
+
+
 def tela_lista(repo: Repositorio, base: BaseConhecimento):
     coluna_titulo, coluna_botao = st.columns([5, 1.3], vertical_alignment="center")
     with coluna_titulo:
@@ -831,6 +947,8 @@ def tela_lista(repo: Repositorio, base: BaseConhecimento):
     if not todos:  # primeiro acesso: nada de cartões zerados nem filtros, só os primeiros passos
         tela_boas_vindas(st.session_state["usuario"])
         return
+
+    faixa_de_avisos(todos, st.session_state["usuario"])
 
     contagem = contar_por_status(todos)
     c1, c2, c3, c4 = st.columns(4)
@@ -1159,6 +1277,16 @@ def _pagina():
     repo = Repositorio(conexao, usuario.id)  # só enxerga os produtos deste usuário
     base = BaseConhecimento(conexao)
 
+    if not st.session_state.get("avisos_dados"):  # só na primeira tela de cada sessão
+        st.session_state["avisos_dados"] = True
+        avisos = avisos_de_vencimento(repo.listar(), date.today(), usuario.avisar_dias)
+        if avisos:
+            primeiro = avisos[0]
+            resto = f" e mais {len(avisos) - 1}" if len(avisos) > 1 else ""
+            st.toast(
+                f"{primeiro.produto.nome}: {quando(primeiro.dias)}{resto}", icon="🔔", duration=8
+            )
+
     # Navegação pedida por código (ex.: depois de salvar): precisa acontecer antes de o menu
     # ser desenhado, porque o Streamlit não deixa mudar um widget depois que ele existe.
     if "ir_para" in st.session_state:
@@ -1169,7 +1297,7 @@ def _pagina():
         st.session_state.setdefault("pagina", PAGINA_LISTA)  # página inicial (o state vence o index)
         pagina = st.radio(
             "Menu", PAGINAS, index=None, key="pagina", label_visibility="collapsed",
-            on_change=_fechar_perfil,
+            on_change=_fechar_tela_da_conta,
         )  # fmt: skip
         with st.container(key="rodape_usuario"):
             coluna_menu, coluna_sair = st.columns([5, 1], vertical_alignment="center", gap="small")
@@ -1183,7 +1311,10 @@ def _pagina():
                     "Editar perfil", icon=":material/badge:", on_click=_abrir_perfil,
                     use_container_width=True,
                 )  # fmt: skip
-                st.caption("🌓 O tema (claro ou escuro) se troca no menu ⋮, no canto superior direito.")
+                st.button(
+                    "Preferências", icon=":material/tune:", on_click=_abrir_preferencias,
+                    use_container_width=True,
+                )  # fmt: skip
             coluna_sair.button("", icon=":material/logout:", on_click=_sair, help="Sair")
 
     mensagem = st.session_state.pop("mensagem_sucesso", None)  # mostra uma vez só
@@ -1192,6 +1323,8 @@ def _pagina():
 
     if st.session_state.get("tela_perfil"):
         tela_perfil(Usuarios(conexao), usuario)
+    elif st.session_state.get("tela_preferencias"):
+        tela_preferencias(Usuarios(conexao), usuario)
     elif pagina == PAGINA_PAINEL:
         tela_painel(repo)
     elif pagina == PAGINA_CADASTRO:

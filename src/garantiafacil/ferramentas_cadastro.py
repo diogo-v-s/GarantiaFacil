@@ -54,6 +54,7 @@ def _resumo(produto: Produto, hoje: date) -> dict:
         "loja": produto.loja,
         "categoria": produto.categoria.value if produto.categoria else "sem categoria",
         "data_da_compra": produto.data_compra.strftime("%d/%m/%Y"),
+        # Fim de toda a cobertura: prazo do fabricante + 90 dias da garantia legal (CDC)
         "garantia_ate": data_vencimento(produto).strftime("%d/%m/%Y"),
         # Texto em vez de número: com um negativo (-8) o modelo leu "8 dias restantes".
         "situacao": _situacao(dias_restantes(produto, hoje)),

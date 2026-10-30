@@ -6,6 +6,7 @@ from datetime import date, timedelta
 from garantiafacil.modelos import Produto
 
 DIAS_ALERTA = 30  # "vence em breve" = faltam até 30 dias
+GARANTIA_LEGAL_DIAS = 90  # CDC art. 26, II: produtos duráveis
 
 
 def somar_meses(data: date, meses: int) -> date:
@@ -18,8 +19,17 @@ def somar_meses(data: date, meses: int) -> date:
     return date(ano, mes, min(data.day, ultimo_dia))
 
 
-def data_vencimento(produto: Produto) -> date:
+def fim_garantia_fabricante(produto: Produto) -> date:
+    """Quando acaba o prazo que o fabricante ou a loja deu (o 'prazo_garantia_meses' do cadastro)."""
     return somar_meses(produto.data_compra, produto.prazo_garantia_meses)
+
+
+def data_vencimento(produto: Produto) -> date:
+    """Fim de toda a cobertura. O CDC (art. 50) diz que a garantia contratual é complementar à legal,
+    e a corrente majoritária soma os prazos: os 90 dias da legal contam depois do fim da contratual
+    (STJ, REsp 967.623). Vale para produto durável; não tratamos o caso de um termo que declara já
+    incluir a garantia legal."""
+    return fim_garantia_fabricante(produto) + timedelta(days=GARANTIA_LEGAL_DIAS)
 
 
 def dias_restantes(produto: Produto, hoje: date | None = None) -> int:

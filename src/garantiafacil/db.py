@@ -19,6 +19,9 @@ _COLUNAS_PERFIL = {
     "documento": "documento TEXT",  # CPF ou CNPJ, só dígitos
     "nome_fantasia": "nome_fantasia TEXT",
     "telefone": "telefone TEXT",  # só dígitos
+    # Antecedência dos avisos de vencimento, como '30,7'. NULL = nunca escolheu (vale o padrão);
+    # texto vazio = escolheu não receber avisos.
+    "avisar_dias": "avisar_dias TEXT",
 }
 # Dono do produto. Nulo só nos produtos de antes do login: sem dono, ninguém os enxerga.
 _COLUNA_USUARIO = "usuario_id INTEGER REFERENCES usuarios(id) ON DELETE CASCADE"
@@ -60,7 +63,8 @@ CREATE TABLE IF NOT EXISTS usuarios (
     {_COLUNAS_PERFIL["tipo"]},
     {_COLUNAS_PERFIL["documento"]},
     {_COLUNAS_PERFIL["nome_fantasia"]},
-    {_COLUNAS_PERFIL["telefone"]}
+    {_COLUNAS_PERFIL["telefone"]},
+    {_COLUNAS_PERFIL["avisar_dias"]}
 );
 
 -- Sessões de "manter conectado". Guardamos só o hash do token, como fazemos com a senha: quem

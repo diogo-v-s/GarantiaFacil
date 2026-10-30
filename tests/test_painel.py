@@ -1,6 +1,7 @@
 from datetime import date
 
 from garantiafacil.modelos import Categoria, Produto
+from tests.ajuda import compra_para_vencer_em
 from garantiafacil.painel import (
     SEM_CATEGORIA,
     formatar_real,
@@ -23,11 +24,11 @@ def produto(nome, compra, meses=12, valor=None, categoria=None) -> Produto:
 
 def catalogo():
     return [
-        produto("TV", date(2026, 3, 1), valor=3000.0, categoria=Categoria.ELETRONICOS),  # vence 01/03/2027
-        produto("Celular", date(2025, 11, 20), valor=2000.0, categoria=Categoria.ELETRONICOS),  # vence 20/11/2026
-        produto("Furadeira", date(2025, 10, 28), valor=500.0, categoria=Categoria.FERRAMENTAS),  # vence hoje
-        produto("Geladeira", date(2025, 1, 10), valor=4000.0, categoria=Categoria.ELETRODOMESTICOS),  # vencida
-        produto("Cadeira", date(2026, 9, 1), valor=None),  # sem valor e sem categoria; vence 01/09/2027
+        produto("TV", compra_para_vencer_em(date(2027, 3, 1)), valor=3000.0, categoria=Categoria.ELETRONICOS),  # vence 01/03/2027
+        produto("Celular", compra_para_vencer_em(date(2026, 11, 20)), valor=2000.0, categoria=Categoria.ELETRONICOS),  # vence 20/11/2026
+        produto("Furadeira", compra_para_vencer_em(date(2026, 10, 28)), valor=500.0, categoria=Categoria.FERRAMENTAS),  # vence hoje
+        produto("Geladeira", compra_para_vencer_em(date(2026, 1, 10)), valor=4000.0, categoria=Categoria.ELETRODOMESTICOS),  # vencida
+        produto("Cadeira", compra_para_vencer_em(date(2027, 9, 1)), valor=None),  # sem valor e sem categoria; vence 01/09/2027
     ]  # fmt: skip
 
 

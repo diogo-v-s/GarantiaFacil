@@ -30,9 +30,18 @@ Marque cada etapa ao concluir. Em cada uma: conceito, código feito junto e um e
       - [x] Foto do produto pela câmera (ou arquivo), no cadastro e nos detalhes do produto
 - [ ] **9. O app trabalha por você** — avisos de vencimento (e-mail/WhatsApp), garantia do
       fabricante somada à legal, termo em PDF sugerindo o prazo.
+      - [x] Termo em PDF sugerindo o prazo (a IA lê o prazo, converte para meses e só aceita se a
+            frase existir no texto; o usuário confirma com "Usar N meses")
+      - [x] Garantia do fabricante somada à legal (decisão de 30/10: os prazos se somam, CDC art. 50;
+            90 dias da legal depois do fim do prazo do fabricante, para produto durável). Sem coluna nova.
+            Não trata o termo que declara já incluir a legal: se for preciso, vira caixa por produto.
+      - [x] Avisos de vencimento no app (faixa em Meus produtos e aviso ao entrar; cada usuário
+            escolhe a antecedência em Preferências). E-mail fica para a etapa 11, com o app sempre
+            no ar.
 - [ ] **10. Chat mais esperto** — chat que age (lembretes, cadastro com confirmação), testar tirar o
       classificador, conjunto de teste separado, servidor MCP próprio.
-- [ ] **11. Deploy** — publicar online, login com Google, banco e arquivos fora da máquina, backup.
+- [ ] **11. Deploy** — publicar online, login com Google, banco e arquivos fora da máquina, backup,
+      avisos de vencimento por e-mail (precisa do app sempre no ar).
 
 Decisões da etapa 8 (29/10/2026): login por e-mail e senha agora e Google só no deploy; perfil
 básico com CPF/CNPJ validado, sem endereço; produtos atuais ficam de fora (começa do zero); o perfil

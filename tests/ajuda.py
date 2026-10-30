@@ -18,3 +18,13 @@ def adotar_orfaos(repo) -> None:
     entregam esses produtos ao usuário do repositório para poder conferir os dados."""
     repo.conexao.execute("UPDATE produtos SET usuario_id = ? WHERE usuario_id IS NULL", (repo.usuario_id,))
     repo.conexao.commit()
+
+
+def compra_para_vencer_em(vencimento, meses=12):
+    """Data de compra que faz a cobertura total (fabricante + garantia legal) acabar em `vencimento`.
+    Evita refazer a conta de cabeça nos testes de vencimento."""
+    from datetime import timedelta
+
+    from garantiafacil.garantia import GARANTIA_LEGAL_DIAS, somar_meses
+
+    return somar_meses(vencimento - timedelta(days=GARANTIA_LEGAL_DIAS), -meses)

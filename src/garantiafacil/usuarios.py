@@ -18,6 +18,7 @@ import sqlite3
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 
+from garantiafacil.avisos import DIAS_PADRAO, dias_para_texto, normalizar_dias, texto_para_dias
 from garantiafacil.cpf_cnpj import so_digitos, validar_cnpj, validar_cpf
 from garantiafacil.modelos import TipoPessoa
 
@@ -40,6 +41,7 @@ class Usuario:
     documento: str = ""  # CPF ou CNPJ, só dígitos
     nome_fantasia: str = ""
     telefone: str = ""  # só dígitos
+    avisar_dias: tuple[int, ...] = DIAS_PADRAO  # antecedência dos avisos de vencimento
 
 
 def _linha_para_usuario(linha: sqlite3.Row) -> Usuario:
@@ -51,6 +53,7 @@ def _linha_para_usuario(linha: sqlite3.Row) -> Usuario:
         documento=linha["documento"] or "",
         nome_fantasia=linha["nome_fantasia"] or "",
         telefone=linha["telefone"] or "",
+        avisar_dias=texto_para_dias(linha["avisar_dias"]),
     )
 
 
@@ -180,6 +183,14 @@ class Usuarios:
         if token:
             self.conexao.execute("DELETE FROM sessoes WHERE token_hash = ?", (_hash_token(token),))
             self.conexao.commit()
+
+    def atualizar_avisos(self, usuario_id: int, dias) -> Usuario:
+        """Grava com quantos dias de antecedência o usuário quer ser avisado (vazio = nenhum aviso)."""
+        self.conexao.execute(
+            "UPDATE usuarios SET avisar_dias = ? WHERE id = ?", (dias_para_texto(dias), usuario_id)
+        )
+        self.conexao.commit()
+        return self.obter(usuario_id)
 
     def atualizar_perfil(
         self,

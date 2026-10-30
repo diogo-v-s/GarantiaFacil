@@ -233,3 +233,42 @@ def test_sessao_some_junto_com_a_conta(usuarios, ana):
     usuarios.conexao.execute("DELETE FROM usuarios WHERE id = ?", (ana.id,))
 
     assert usuarios.usuario_da_sessao(token) is None
+
+
+# ---------- avisos de vencimento ----------
+
+
+def test_conta_nova_usa_a_antecedencia_padrao(ana):
+    assert ana.avisar_dias == (30, 7)
+
+
+def test_escolher_a_antecedencia_dos_avisos(usuarios, ana):
+    salvo = usuarios.atualizar_avisos(ana.id, [7, 60, 7, 15])
+
+    assert salvo.avisar_dias == (60, 15, 7)
+    assert usuarios.autenticar("ana@exemplo.com", "senha-segura-1").avisar_dias == (60, 15, 7)
+
+
+def test_desligar_os_avisos_e_diferente_de_nunca_ter_escolhido(usuarios, ana):
+    assert usuarios.atualizar_avisos(ana.id, []).avisar_dias == ()
+
+
+def test_banco_antigo_sem_a_coluna_dos_avisos_ganha_o_padrao(tmp_path):
+    import sqlite3
+
+    from garantiafacil.db import conectar
+
+    caminho = tmp_path / "antigo.db"
+    antigo = sqlite3.connect(caminho)
+    antigo.executescript(
+        "CREATE TABLE usuarios (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL UNIQUE, "
+        "senha_hash TEXT NOT NULL, nome TEXT NOT NULL, criado_em TEXT NOT NULL DEFAULT "
+        "(datetime('now')), tipo TEXT, documento TEXT, nome_fantasia TEXT, telefone TEXT);"
+        f"INSERT INTO usuarios (email, senha_hash, nome) VALUES ('a@a.com', '{gerar_hash('x' * 8)}', 'Ana');"
+    )
+    antigo.commit()
+    antigo.close()
+
+    usuarios = Usuarios(conectar(caminho))
+
+    assert usuarios.obter(1).avisar_dias == (30, 7)

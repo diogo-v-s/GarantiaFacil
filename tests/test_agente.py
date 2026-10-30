@@ -10,7 +10,7 @@ from garantiafacil.db import conectar
 from garantiafacil.ferramentas_cadastro import criar_ferramentas
 from garantiafacil.modelos import Categoria, Produto
 from garantiafacil.repositorio import Repositorio
-from tests.ajuda import banco_com_usuario
+from tests.ajuda import banco_com_usuario, compra_para_vencer_em
 
 HOJE = date(2026, 6, 1)
 
@@ -87,9 +87,9 @@ def repo(tmp_path):
     )
     repo._indexar = lambda produto: True  # sem embeddings nos testes
     cadastros = [
-        ("Geladeira Brastemp", date(2026, 1, 1), 12, Categoria.ELETRODOMESTICOS),  # até 01/01/2027
-        ("Moto G60", date(2025, 6, 20), 12, Categoria.ELETRONICOS),  # até 20/06/2026: 19 dias
-        ("Xbox Series S", date(2025, 1, 1), 12, Categoria.ELETRONICOS),  # venceu em 01/01/2026
+        ("Geladeira Brastemp", compra_para_vencer_em(date(2027, 1, 1)), 12, Categoria.ELETRODOMESTICOS),  # cobertura até 01/01/2027
+        ("Moto G60", compra_para_vencer_em(date(2026, 6, 20)), 12, Categoria.ELETRONICOS),  # até 20/06/2026: 19 dias
+        ("Xbox Series S", compra_para_vencer_em(date(2026, 1, 1)), 12, Categoria.ELETRONICOS),  # venceu em 01/01/2026
     ]
     for nome, compra, meses, categoria in cadastros:
         repo.adicionar(

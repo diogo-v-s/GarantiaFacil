@@ -447,3 +447,30 @@ def test_excluir_remove_a_pasta_do_produto(repo, tmp_path):
     repo.excluir(produto.id)
 
     assert not pasta.exists()
+
+
+def test_atualizar_prazo_muda_o_vencimento(repo):
+    produto = repo.adicionar(novo_produto())
+
+    repo.atualizar_prazo(produto.id, 24)
+
+    assert repo.obter(produto.id).prazo_garantia_meses == 24
+
+
+@pytest.mark.parametrize("meses", [0, -1, 121])
+def test_atualizar_prazo_recusa_valor_fora_do_limite(repo, meses):
+    produto = repo.adicionar(novo_produto())
+
+    with pytest.raises(ValueError):
+        repo.atualizar_prazo(produto.id, meses)
+
+    assert repo.obter(produto.id).prazo_garantia_meses == 12
+
+
+def test_usuario_nao_muda_o_prazo_de_produto_de_outro(tmp_path):
+    ana, bia = dois_repositorios(tmp_path)
+    produto = ana.adicionar(novo_produto())
+
+    bia.atualizar_prazo(produto.id, 36)
+
+    assert ana.obter(produto.id).prazo_garantia_meses == 12
