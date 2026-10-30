@@ -53,6 +53,8 @@ def rota_da(mensagem) -> str:
     agente: consultou o cadastro com ferramentas; esclarecimento: perguntou de qual produto;
     sem_termo: produto sem termo, respondeu com o CDC; documentos_produto: usou o termo do
     produto; cdc: respondeu só com as leis."""
+    if mensagem.rota:
+        return mensagem.rota
     if mensagem.consultas:
         return "agente"
     texto = mensagem.texto

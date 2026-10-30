@@ -119,6 +119,7 @@ class Mensagem:
     citacoes_invalidas: list[int] = field(default_factory=list)
     produto: Produto | None = None  # produto usado na resposta, se houve
     consultas: list[Consulta] = field(default_factory=list)  # ferramentas que o agente usou
+    rota: str | None = None  # só o chat sem classificador preenche; senão a avaliação deduz do resto
 
 
 _SINAIS_DE_CADASTRO = re.compile(

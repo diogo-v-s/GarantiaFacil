@@ -86,9 +86,12 @@ def executar_agente(
     ferramentas: list[Ferramenta],
     sistema: str,
     max_passos: int = MAX_PASSOS,
+    historico: list[dict] | None = None,
 ) -> RespostaAgente:
+    """`historico`: mensagens anteriores da conversa (só texto, no formato neutro), para perguntas
+    de seguimento como 'e da TV?'. Sem ele, cada pergunta começa do zero."""
     por_nome = {f.nome: f for f in ferramentas}
-    mensagens: list[dict] = [{"papel": "usuario", "texto": pergunta}]
+    mensagens: list[dict] = [*(historico or []), {"papel": "usuario", "texto": pergunta}]
     consultas: list[Consulta] = []
 
     for _ in range(max_passos):

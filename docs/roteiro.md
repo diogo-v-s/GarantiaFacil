@@ -28,7 +28,7 @@ Marque cada etapa ao concluir. Em cada uma: conceito, código feito junto e um e
       - [x] Tema escuro (claro e escuro no config.toml; o usuário troca no menu ⋮; nossas cores
             seguem o tema ativo)
       - [x] Foto do produto pela câmera (ou arquivo), no cadastro e nos detalhes do produto
-- [ ] **9. O app trabalha por você** — avisos de vencimento (e-mail/WhatsApp), garantia do
+- [x] **9. O app trabalha por você** — avisos de vencimento (e-mail/WhatsApp), garantia do
       fabricante somada à legal, termo em PDF sugerindo o prazo.
       - [x] Termo em PDF sugerindo o prazo (a IA lê o prazo, converte para meses e só aceita se a
             frase existir no texto; o usuário confirma com "Usar N meses")
@@ -40,7 +40,26 @@ Marque cada etapa ao concluir. Em cada uma: conceito, código feito junto e um e
             no ar.
 - [ ] **10. Chat mais esperto** — chat que age (lembretes, cadastro com confirmação), testar tirar o
       classificador, conjunto de teste separado, servidor MCP próprio.
-- [ ] **11. Deploy** — publicar online, login com Google, banco e arquivos fora da máquina, backup,
+      - [x] Conjunto de teste separado (30 casos novos; Claude: 25/30 no teste contra 29/29 no
+            desenvolvimento; as 5 falhas são do classificador)
+      - [x] Testar tirar o classificador (`conversa_agente.py`; Claude: 57/61 contra 56/61 do
+            chat atual, sem os erros de rota; adotado no app com a chave CHAT_MODO: agente com o
+            Claude, classificador com o Ollama, que ainda falta medir no modo agente)
+      - [x] Ferramenta `total_gasto` (exercício)
+      - [ ] Chat que age (lembretes e cadastro com confirmação)
+      - [ ] Servidor MCP próprio
+- [ ] **11. Onde acionar a garantia** — assistências que atendem o produto (nome, endereço, contato),
+      buscadas na internet perto do endereço do usuário. Pedido de 30/10; ainda não detalhado.
+      - [ ] Endereço no perfil (opcional; decidido em 30/10: se houver, é o padrão da busca; se não,
+            pergunta a cidade na hora) — coluna nova; falta decidir CEP ou endereço completo
+      - [x] Demonstração com OpenStreetMap (30/10): `assistencias.py` (Nominatim acha a cidade,
+            Overpass lista lojas e oficinas num raio de 6 km; cache de 7 dias; só repassa o que o
+            mapa tem). Google Places fica para depois: exige cartão e ainda não dá para pagar
+      - [x] Tela "Onde acionar" (cidade digitada na hora) e ferramenta `onde_acionar_garantia` no chat
+      - [ ] Medir a qualidade: em Campinas vieram lugares sem telefone (a maioria) e lojas que não
+            são assistência (Vivo, TIM, Magazine Luiza); o Overpass público é lento (~1 min) e às
+            vezes dá erro 502. Decidir se compensa trocar a fonte
+- [ ] **12. Deploy** — publicar online, login com Google, banco e arquivos fora da máquina, backup,
       avisos de vencimento por e-mail (precisa do app sempre no ar).
 
 Decisões da etapa 8 (29/10/2026): login por e-mail e senha agora e Google só no deploy; perfil

@@ -1,0 +1,620 @@
+{
+  "modelo": "claude-haiku-5-5",
+  "data_simulada": "2026-10-28",
+  "nota": "28/30",
+  "resultados": [
+    {
+      "caso": "t-cad-01-loja-tv",
+      "tipo": "cadastro",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "detalhes_produto",
+          {
+            "nome": "TV"
+          }
+        ]
+      ],
+      "texto": "Você comprou a Smart TV Samsung 50 nas Casas Bahia, em 16/09/2025.",
+      "segundos": 9.64286149997497,
+      "opcional": false,
+      "produto": "Smart TV Samsung 50"
+    },
+    {
+      "caso": "t-cad-02-preco-geladeira",
+      "tipo": "cadastro",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "detalhes_produto",
+          {
+            "nome": "geladeira"
+          }
+        ]
+      ],
+      "texto": "A geladeira Brastemp 375L custou R$ 3.499,90, comprada na Magazine Luiza em 10/12/2025.",
+      "segundos": 2.5940346000134014,
+      "opcional": false,
+      "produto": "Geladeira Brastemp 375L"
+    },
+    {
+      "caso": "t-cad-03-quantos",
+      "tipo": "cadastro",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "listar_produtos",
+          {}
+        ]
+      ],
+      "texto": "Você tem 5 produtos cadastrados:\n\n1. Notebook Dell Inspiron 15: garantia até 01/10/2027\n2. Geladeira Brastemp 375L: garantia até 10/03/2027\n3. Smart TV Samsung 50: garantia até 15/12/2026\n4. Furadeira Bosch: garantia até 20/11/2026\n5. iPhone 15: garantia até 22/03/2026 (já venceu)",
+      "segundos": 2.278240400017239,
+      "opcional": false,
+      "produto": null
+    },
+    {
+      "caso": "t-cad-04-notebook-vigente",
+      "tipo": "cadastro",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "detalhes_produto",
+          {
+            "nome": "notebook"
+          }
+        ]
+      ],
+      "texto": "Sim. O Notebook Dell Inspiron 15 está na garantia, que vence em 01/10/2027.",
+      "segundos": 2.5361454999947455,
+      "opcional": false,
+      "produto": "Notebook Dell Inspiron 15"
+    },
+    {
+      "caso": "t-cad-05-iphone-coberto",
+      "tipo": "cadastro",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "detalhes_produto",
+          {
+            "nome": "iPhone"
+          }
+        ]
+      ],
+      "texto": "Não. A garantia do iPhone 15 venceu em 22/03/2026.",
+      "segundos": 3.083191199984867,
+      "opcional": false,
+      "produto": "iPhone 15"
+    },
+    {
+      "caso": "t-cad-06-este-mes",
+      "tipo": "cadastro",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "vencimentos_proximos",
+          {
+            "dias": 3
+          }
+        ]
+      ],
+      "texto": "Não há nenhuma garantia vencendo até o fim deste mês (31/10/2026).",
+      "segundos": 2.585721100011142,
+      "opcional": false,
+      "produto": null
+    },
+    {
+      "caso": "t-cad-07-so-ferramentas",
+      "tipo": "cadastro",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "listar_produtos",
+          {
+            "categoria": "Ferramentas"
+          }
+        ]
+      ],
+      "texto": "Você tem 1 produto na categoria Ferramentas:\n\n- **Furadeira Bosch**: a garantia vence em **20/11/2026** (faltam 23 dias).",
+      "segundos": 2.2817645000177436,
+      "opcional": false,
+      "produto": "Furadeira Bosch"
+    },
+    {
+      "caso": "t-cad-08-quanto-falta-tv",
+      "tipo": "cadastro",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "detalhes_produto",
+          {
+            "nome": "TV"
+          }
+        ]
+      ],
+      "texto": "A garantia da sua Smart TV Samsung 50 vence em 15/12/2026, faltando 48 dias a partir de hoje (28/10/2026).",
+      "segundos": 2.1132108999881893,
+      "opcional": false,
+      "produto": "Smart TV Samsung 50"
+    },
+    {
+      "caso": "t-cad-09-comprado-em-2026",
+      "tipo": "cadastro",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "listar_produtos",
+          {}
+        ]
+      ],
+      "texto": "Você tem um produto comprado em 2026:\n\n- **Notebook Dell Inspiron 15**, comprado em 03/07/2026. A garantia vence em 01/10/2027.",
+      "segundos": 2.4585644000035245,
+      "opcional": false,
+      "produto": "Notebook Dell Inspiron 15"
+    },
+    {
+      "caso": "t-cad-10-loja-e-vencimento",
+      "tipo": "cadastro",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "detalhes_produto",
+          {
+            "nome": "furadeira"
+          }
+        ]
+      ],
+      "texto": "A furadeira Bosch foi comprada na Leroy Merlin, e a garantia vai até 20/11/2026 (faltam 23 dias).",
+      "segundos": 2.2135068000061437,
+      "opcional": false,
+      "produto": "Furadeira Bosch"
+    },
+    {
+      "caso": "t-cad-11-mais-caro",
+      "tipo": "cadastro",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "listar_produtos",
+          {}
+        ],
+        [
+          "detalhes_produto",
+          {
+            "nome": "Notebook Dell Inspiron 15"
+          }
+        ],
+        [
+          "detalhes_produto",
+          {
+            "nome": "Geladeira Brastemp 375L"
+          }
+        ],
+        [
+          "detalhes_produto",
+          {
+            "nome": "Smart TV Samsung 50"
+          }
+        ],
+        [
+          "detalhes_produto",
+          {
+            "nome": "Furadeira Bosch"
+          }
+        ],
+        [
+          "detalhes_produto",
+          {
+            "nome": "iPhone 15"
+          }
+        ]
+      ],
+      "texto": "O produto mais caro que você tem é o **iPhone 15**, pago R$ 7.299,00 na Apple Store. A garantia venceu em 22/03/2026.",
+      "segundos": 4.545171000005212,
+      "opcional": false,
+      "produto": "iPhone 15"
+    },
+    {
+      "caso": "t-cad-12-produto-inexistente",
+      "tipo": "cadastro",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "listar_produtos",
+          {
+            "status": "em_garantia"
+          }
+        ]
+      ],
+      "texto": "Não encontrei o fone de ouvido entre os produtos com garantia vigente. Os produtos que estão na garantia hoje são:\n\n- Notebook Dell Inspiron 15: vence em 01/10/2027\n- Geladeira Brastemp 375L: vence em 10/03/2027\n- Smart TV Samsung 50: vence em 15/12/2026\n- Furadeira Bosch: vence em 20/11/2026\n\nQuer que eu verifique se o fone está com a garantia vencida ou se ele ainda não foi cadastrado?",
+      "segundos": 4.158513400005177,
+      "opcional": false,
+      "produto": null
+    },
+    {
+      "caso": "t-lei-01-devolver-online",
+      "tipo": "lei",
+      "passou": true,
+      "falhas": [],
+      "rota": "cdc",
+      "ferramentas": [
+        [
+          "consultar_documentos",
+          {
+            "pergunta": "Posso devolver algo que comprei pelo site da loja? Qual o prazo para desistir de compra feita pela internet?"
+          }
+        ]
+      ],
+      "texto": "Sim. Pelo Código de Defesa do Consumidor (art. 49), quando a compra é feita fora da loja física, como pela internet, você pode desistir em até 7 dias a contar do recebimento do produto. Nesse caso, os valores pagos devem ser devolvidos de imediato, com correção monetária. Não tenho os termos de devolução da loja, então vale conferir a política dela também.",
+      "segundos": 5.684388699999545,
+      "opcional": false,
+      "produto": null
+    },
+    {
+      "caso": "t-lei-02-recusa-troca",
+      "tipo": "lei",
+      "passou": true,
+      "falhas": [],
+      "rota": "cdc",
+      "ferramentas": [
+        [
+          "consultar_documentos",
+          {
+            "pergunta": "O vendedor pode se recusar a trocar um produto com defeito?"
+          }
+        ]
+      ],
+      "texto": "Pelo Código de Defesa do Consumidor (art. 18), o fornecedor responde pelo vício do produto e o consumidor pode exigir a substituição das partes viciadas. Se o vício não for sanado em até 30 dias, você pode escolher entre trocar o produto por outro da mesma espécie, pedir a devolução do dinheiro ou um abatimento no preço. Os trechos que tenho não tratam expressamente de uma recusa do vendedor, então não posso afirmar mais do que isso.",
+      "segundos": 4.605642399983481,
+      "opcional": false,
+      "produto": null
+    },
+    {
+      "caso": "t-lei-03-inicio-do-prazo",
+      "tipo": "lei",
+      "passou": true,
+      "falhas": [],
+      "rota": "cdc",
+      "ferramentas": [
+        [
+          "consultar_documentos",
+          {
+            "pergunta": "A partir de quando conta o prazo para reclamar?"
+          }
+        ]
+      ],
+      "texto": "O prazo para reclamar de vícios aparentes começa na **entrega efetiva do produto** (ou no término do serviço), conforme o art. 26, §1º do CDC. Para vícios ocultos, a contagem começa no momento em que o defeito fica evidenciado (§3º). Os prazos são de 30 dias para produtos não duráveis e 90 dias para duráveis.",
+      "segundos": 3.6762031000107527,
+      "opcional": false,
+      "produto": null
+    },
+    {
+      "caso": "t-lei-04-defeito-tardio",
+      "tipo": "lei",
+      "passou": true,
+      "falhas": [],
+      "rota": "cdc",
+      "ferramentas": [
+        [
+          "consultar_documentos",
+          {
+            "pergunta": "E se o defeito só aparecer meses depois da compra?"
+          }
+        ]
+      ],
+      "texto": "Se o defeito é oculto (não dava para ver na compra), o prazo de 90 dias para produtos duráveis só começa a contar quando o defeito fica evidente (CDC, art. 26, §3º). Para defeitos aparentes, a contagem começa na entrega do produto. Não tenho como confirmar, pelo cadastro, se algum dos seus produtos se enquadra nessa situação.",
+      "segundos": 3.8598264000029303,
+      "opcional": false,
+      "produto": null
+    },
+    {
+      "caso": "t-lei-05-nao-duravel",
+      "tipo": "lei",
+      "passou": true,
+      "falhas": [],
+      "rota": "cdc",
+      "ferramentas": [
+        [
+          "consultar_documentos",
+          {
+            "pergunta": "Qual o prazo para reclamar de um alimento estragado?"
+          }
+        ]
+      ],
+      "texto": "Para alimento estragado, que é produto não durável, o CDC (art. 26, I) dá **30 dias** para reclamar de vício aparente ou de fácil constatação, contados da entrega do produto. Se o defeito estiver oculto, o prazo começa quando ele ficar evidente (art. 26, §3º). Uma reclamação formulada ao fornecedor interrompe a contagem até a resposta negativa (art. 26, §2º).",
+      "segundos": 4.152081599982921,
+      "opcional": false,
+      "produto": null
+    },
+    {
+      "caso": "t-lei-06-dinheiro-de-volta",
+      "tipo": "lei",
+      "passou": true,
+      "falhas": [],
+      "rota": "cdc",
+      "ferramentas": [
+        [
+          "consultar_documentos",
+          {
+            "pergunta": "Posso exigir meu dinheiro de volta se o produto não tiver conserto?"
+          }
+        ]
+      ],
+      "texto": "Sim. Pelo Código de Defesa do Consumidor (art. 18, § 1º), se o vício não for sanado em até 30 dias, você pode escolher entre a substituição do produto, a restituição da quantia paga (com correção monetária) ou o abatimento proporcional do preço. Não consigo ver no cadastro se um produto tem conserto. Se quiser, me diga qual produto é e eu consulto a garantia dele.",
+      "segundos": 5.462809399992693,
+      "opcional": false,
+      "produto": null
+    },
+    {
+      "caso": "t-termo-01-controle",
+      "tipo": "termo",
+      "passou": true,
+      "falhas": [],
+      "rota": "documentos_produto",
+      "ferramentas": [
+        [
+          "consultar_documentos",
+          {
+            "pergunta": "A garantia da TV cobre o controle remoto?",
+            "produto": "TV"
+          }
+        ]
+      ],
+      "texto": "Sim. Segundo o termo de garantia da sua Smart TV Samsung 50 polegadas, a garantia cobre defeitos de fabricação no controle remoto, além do painel, da placa principal e da fonte. O reparo deve ser feito em assistência técnica autorizada, porque abrir o aparelho por terceiros faz perder a garantia.",
+      "segundos": 3.0199238000204787,
+      "opcional": false,
+      "produto": "Smart TV Samsung 50"
+    },
+    {
+      "caso": "t-termo-02-tecnico-qualquer",
+      "tipo": "termo",
+      "passou": false,
+      "falhas": [
+        "rota: esperava documentos_produto, foi agente"
+      ],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "listar_produtos",
+          {}
+        ],
+        [
+          "consultar_documentos",
+          {
+            "pergunta": "Se eu deixar um técnico qualquer abrir a TV, perco a garantia?",
+            "produto": "Smart TV Samsung 50"
+          }
+        ]
+      ],
+      "texto": "Sim, pelo termo de garantia da sua Smart TV Samsung 50, a abertura do aparelho por terceiros faz perder a garantia. O reparo deve ser feito somente em assistência técnica autorizada.",
+      "segundos": 4.799247799994191,
+      "opcional": false,
+      "produto": "Smart TV Samsung 50"
+    },
+    {
+      "caso": "t-termo-03-o-que-levar",
+      "tipo": "termo",
+      "passou": true,
+      "falhas": [],
+      "rota": "documentos_produto",
+      "ferramentas": [
+        [
+          "consultar_documentos",
+          {
+            "pergunta": "O que preciso levar para acionar a garantia da TV?",
+            "produto": "TV"
+          }
+        ]
+      ],
+      "texto": "Para acionar a garantia da TV, leve a **nota fiscal** e um **documento com foto** a uma **assistência técnica autorizada**. O reparo precisa ser feito nessa assistência, porque a abertura do aparelho por terceiros faz perder a garantia.",
+      "segundos": 3.8178410999826156,
+      "opcional": false,
+      "produto": "Smart TV Samsung 50"
+    },
+    {
+      "caso": "t-termo-04-uso-comercial",
+      "tipo": "termo",
+      "passou": true,
+      "falhas": [],
+      "rota": "documentos_produto",
+      "ferramentas": [
+        [
+          "consultar_documentos",
+          {
+            "pergunta": "A garantia da TV vale se eu usar no meu restaurante?",
+            "produto": "TV"
+          }
+        ]
+      ],
+      "texto": "Não. O termo de garantia da sua TV Samsung exclui expressamente o **uso comercial do aparelho**, então um uso no restaurante provavelmente não estaria coberto. Para confirmar o caso, vale consultar a assistência técnica autorizada.",
+      "segundos": 3.2208198999869637,
+      "opcional": false,
+      "produto": "Smart TV Samsung 50"
+    },
+    {
+      "caso": "t-termo-05-raio",
+      "tipo": "termo",
+      "passou": false,
+      "falhas": [
+        "rota: esperava documentos_produto, foi agente"
+      ],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "listar_produtos",
+          {}
+        ],
+        [
+          "consultar_documentos",
+          {
+            "pergunta": "A garantia cobre danos causados por raio, queima da TV?",
+            "produto": "Smart TV Samsung 50"
+          }
+        ]
+      ],
+      "texto": "Não. O termo de garantia da Smart TV Samsung 50 exclui expressamente danos causados por descargas elétricas, e um raio se enquadra nisso. A garantia dela vai até 15/12/2026, mas esse prazo não muda a exclusão.",
+      "segundos": 6.382135899999412,
+      "opcional": false,
+      "produto": "Smart TV Samsung 50"
+    },
+    {
+      "caso": "t-termo-06-inicio-12-meses",
+      "tipo": "termo",
+      "passou": true,
+      "falhas": [],
+      "rota": "documentos_produto",
+      "ferramentas": [
+        [
+          "consultar_documentos",
+          {
+            "pergunta": "Desde quando conta o prazo de 12 meses da garantia?",
+            "produto": "TV"
+          }
+        ]
+      ],
+      "texto": "A garantia de 12 meses da sua TV (Smart TV Samsung 50 polegadas) conta a partir da data de emissão da nota fiscal de compra.",
+      "segundos": 2.9198755999968853,
+      "opcional": false,
+      "produto": "Smart TV Samsung 50"
+    },
+    {
+      "caso": "t-sem-01-iphone",
+      "tipo": "sem_termo",
+      "passou": true,
+      "falhas": [],
+      "rota": "sem_termo",
+      "ferramentas": [
+        [
+          "consultar_documentos",
+          {
+            "pergunta": "O que a garantia do iPhone cobre?",
+            "produto": "iPhone"
+          }
+        ]
+      ],
+      "texto": "Não há termo de garantia cadastrado para iPhone 15. Pelo CDC, se o produto tiver um vício, o fornecedor responde por ele. Se o vício não for sanado em até 30 dias, você pode escolher entre a substituição do produto, a restituição do valor pago ou o abatimento proporcional do preço.",
+      "segundos": 4.047024500003317,
+      "opcional": false,
+      "produto": "iPhone 15"
+    },
+    {
+      "caso": "t-sem-02-furadeira-motor",
+      "tipo": "sem_termo",
+      "passou": true,
+      "falhas": [],
+      "rota": "sem_termo",
+      "ferramentas": [
+        [
+          "consultar_documentos",
+          {
+            "pergunta": "A garantia cobre motor queimado?",
+            "produto": "furadeira"
+          }
+        ]
+      ],
+      "texto": "Não há termo de garantia cadastrado para Furadeira Bosch. Pelo CDC: o fornecedor responde por vícios de qualidade que tornem o produto impróprio ao consumo, e você pode exigir o conserto ou a substituição das partes viciadas. Se o vício não for sanado em 30 dias, pode pedir a troca do produto, a devolução do valor pago ou o abatimento do preço. O prazo para reclamar de vícios aparentes ou de fácil constatação é de 90 dias para produtos duráveis, contados da entrega. Não consigo dizer se motor queimado está coberto, pois o termo não está cadastrado.",
+      "segundos": 4.4426885999855585,
+      "opcional": false,
+      "produto": "Furadeira Bosch"
+    },
+    {
+      "caso": "t-esc-01-queda",
+      "tipo": "esclarecimento",
+      "passou": true,
+      "falhas": [],
+      "rota": "esclarecimento",
+      "ferramentas": [
+        [
+          "listar_produtos",
+          {}
+        ]
+      ],
+      "texto": "De qual produto você está falando?\n\n1. Notebook Dell Inspiron 15\n2. Geladeira Brastemp 375L\n3. Smart TV Samsung 50\n4. Furadeira Bosch\n5. iPhone 15",
+      "segundos": 2.8517637999902945,
+      "opcional": false,
+      "produto": null
+    },
+    {
+      "caso": "t-ctx-01-valor-da-tv",
+      "tipo": "contexto",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "detalhes_produto",
+          {
+            "nome": "TV"
+          }
+        ]
+      ],
+      "texto": "A Smart TV Samsung 50\" custou R$ 2.899,00 (comprada na Casas Bahia em 16/09/2025).",
+      "segundos": 4.648022699984722,
+      "opcional": false,
+      "produto": "Smart TV Samsung 50"
+    },
+    {
+      "caso": "t-ctx-02-assistencia",
+      "tipo": "contexto",
+      "passou": true,
+      "falhas": [],
+      "rota": "documentos_produto",
+      "ferramentas": [
+        [
+          "consultar_documentos",
+          {
+            "pergunta": "e a assistência pode ser qualquer uma?",
+            "produto": "Smart TV Samsung 50"
+          }
+        ]
+      ],
+      "texto": "Não. Segundo o termo de garantia da Smart TV Samsung 50 polegadas, o reparo deve ser feito somente em assistência técnica autorizada. Se a abertura do aparelho for feita por terceiros, a garantia se perde. Para acionar a garantia, leve a nota fiscal e um documento com foto a uma assistência autorizada.",
+      "segundos": 7.759659600007581,
+      "opcional": false,
+      "produto": "Smart TV Samsung 50"
+    },
+    {
+      "caso": "t-ctx-03-amplia-janela",
+      "tipo": "contexto",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "vencimentos_proximos",
+          {
+            "dias": 120
+          }
+        ]
+      ],
+      "texto": "Em 120 dias, são as mesmas duas garantias:\n\n- **Furadeira Bosch**: garantia até 20/11/2026 (faltam 23 dias)\n- **Smart TV Samsung 50**: garantia até 15/12/2026 (faltam 48 dias)",
+      "segundos": 4.239726500003599,
+      "opcional": false,
+      "produto": null
+    }
+  ]
+}

@@ -10,6 +10,7 @@ from garantiafacil.agente import Ferramenta
 from garantiafacil.garantia import data_vencimento, dias_restantes, status_garantia
 from garantiafacil.localizar import localizar_produto
 from garantiafacil.modelos import Categoria, Produto
+from garantiafacil.painel import formatar_real
 
 # Os status internos são 'vigente', 'vence_em_breve' e 'vencida'. Para o usuário, "garantia
 # vigente" inclui a que está para vencer; por isso o filtro 'em_garantia' junta as duas.
@@ -43,6 +44,12 @@ def _sem_acento(texto: str) -> str:
     return "".join(c for c in decomposto if unicodedata.category(c) != "Mn")
 
 
+def _achar_categoria(texto: str) -> Categoria | None:
+    """A categoria que bate com o texto, sem se importar com acento e maiúsculas; None se não houver."""
+    procurada = _sem_acento(texto)
+    return next((c for c in Categoria if _sem_acento(c.value) == procurada), None)
+
+
 def _situacao(dias: int) -> str:
     # Vencido: sem número de dias. "há 8 dias" virou "8 dias após a compra" no modelo local.
     return f"faltam {dias} dias para vencer" if dias >= 0 else "já venceu"
@@ -73,12 +80,30 @@ def criar_ferramentas(repositorio, hoje: date | None = None) -> list[Ferramenta]
                 return {"erro": f"status inválido; use um de {sorted(FILTROS_STATUS)}"}
             produtos = [p for p in produtos if status_garantia(p, hoje) in FILTROS_STATUS[status]]
         if categoria:
-            procurada = _sem_acento(categoria)
-            valida = [c for c in Categoria if _sem_acento(c.value) == procurada]
-            if not valida:
+            escolhida = _achar_categoria(categoria)
+            if escolhida is None:
                 return {"erro": f"categoria inválida; use uma de {[c.value for c in Categoria]}"}
-            produtos = [p for p in produtos if p.categoria == valida[0]]
+            produtos = [p for p in produtos if p.categoria == escolhida]
         return {"total": len(produtos), "produtos": [_resumo(p, hoje) for p in produtos]}
+
+    def total_gasto(categoria: str | None = None) -> dict:
+        produtos = repositorio.listar()
+        nome_da_categoria = "todas"
+        if categoria:
+            escolhida = _achar_categoria(categoria)
+            if escolhida is None:
+                return {"erro": f"categoria inválida; use uma de {[c.value for c in Categoria]}"}
+            produtos = [p for p in produtos if p.categoria == escolhida]
+            nome_da_categoria = escolhida.value
+        com_valor = [p for p in produtos if p.valor is not None]
+        sem_valor = [p.nome for p in produtos if p.valor is None]
+        return {
+            "categoria": nome_da_categoria,
+            # Texto pronto ("R$ 14.348,00"): com número solto o modelo erra a formatação
+            "total_gasto": formatar_real(sum(p.valor for p in com_valor)),
+            "produtos_somados": len(com_valor),
+            "produtos_sem_valor_informado": sem_valor,
+        }
 
     def vencimentos_proximos(dias: int = 30) -> dict:
         limite = int(dias)
@@ -124,6 +149,22 @@ def criar_ferramentas(repositorio, hoje: date | None = None) -> list[Ferramenta]
                     "type": "string",
                     "enum": [c.value for c in Categoria],
                     "description": "mostra só os produtos desta categoria",
+                },
+            },
+        ),
+        Ferramenta(
+            nome="total_gasto",
+            funcao=total_gasto,
+            descricao=(
+                "Soma o valor pago nos produtos cadastrados. Use para 'quanto gastei', 'quanto paguei "
+                "no total', 'quanto gastei com eletrônicos'. Sem categoria soma tudo. Devolve também "
+                "os produtos sem valor informado, que ficam fora da soma: avise o usuário se houver."
+            ),
+            parametros={
+                "categoria": {
+                    "type": "string",
+                    "enum": [c.value for c in Categoria],
+                    "description": "soma só os produtos desta categoria; omita para somar tudo",
                 },
             },
         ),

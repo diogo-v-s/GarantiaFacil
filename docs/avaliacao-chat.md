@@ -117,3 +117,90 @@ Bugs que só apareceram com a API real (o cliente falso não pegava):
 **Trechos por provedor (29/10).** `trechos_por_resposta()` entrega 5 trechos com o Claude e 3 com o
 Ollama (`LLM_PROVIDER`). Rodada completa com 5 trechos no Claude: 29/29, 5 s por caso, igual a antes:
 a régua atual não distingue a diferença. O ganho só aparece num conjunto de teste separado.
+
+## Conjunto de teste separado (30/10/2026)
+
+`avaliacao/casos_teste.py`: 30 casos novos, em frases que o prompt nunca viu, na mesma base. Regra:
+**não se ajusta nada olhando para eles** (`uv run python -m avaliacao.rodar --conjunto teste`). Se um
+caso revelar um erro real, conserta-se, o caso vai para `casos.py` e se escreve outro no lugar. Um
+teste garante que nenhuma pergunta se repete entre os dois conjuntos.
+
+Antes de rodar: a garantia passou a somar 90 dias da lei (etapa 9), então as datas de compra da base
+ficaram 90 dias mais antigas para os vencimentos dos casos continuarem os mesmos. O conjunto de
+desenvolvimento seguiu em 29/29, confirmando que nada quebrou.
+
+**Resultado com `claude-haiku-5-5`: 25/30 (83%)**, contra 29/29 (100%) nos casos de desenvolvimento.
+Essa diferença de 17 pontos é o quanto os 100% eram ajuste aos exemplos conhecidos.
+
+| Tipo | Desenvolvimento | Teste |
+|---|---|---|
+| cadastro | 11/11 | 10/12 |
+| lei | 5/5 | 6/6 |
+| termo | 4/4 | 4/6 |
+| sem termo | 3/3 | 2/2 |
+| esclarecimento | 2/2 | 1/1 |
+| contexto | 4/4 | 2/3 |
+
+As 5 falhas são **todas de roteamento** (o classificador mandou a pergunta pelo caminho errado), não de
+conteúdo:
+- `t-cad-04` e `t-cad-05` ("O notebook ainda está na garantia?", "O iPhone ainda está coberto?"): foram
+  para "produto sem termo" e responderam com o CDC em vez de consultar o cadastro.
+- `t-termo-02` e `t-termo-06` (perda de garantia ao abrir a TV; desde quando conta o prazo): foram para o
+  CDC e ignoraram o termo da TV.
+- `t-ctx-01` ("e da TV?" depois de perguntar o valor da geladeira): foi para o termo em vez do cadastro.
+
+**Conclusão:** o ponto fraco é o classificador, que decide a rota por uma pergunta antes de o modelo
+ver as ferramentas. O padrão se repete: a pergunta mistura "garantia" com um produto e o classificador
+escolhe documento ou lei. Isso sustenta o próximo experimento (tirar o classificador e deixar o agente
+decidir, com o RAG como ferramenta) e dá a régua para medir: ele precisa passar de 25/30 no conjunto
+de teste sem piorar o de desenvolvimento.
+
+Cuidado: com 30 casos, 1 acerto são 3 pontos; só diferenças de 3 ou mais casos contam como sinal.
+
+## Ferramenta `total_gasto` (30/10)
+
+Criada a ferramenta (soma o valor pago, com filtro de categoria e aviso dos produtos sem valor) e os
+2 casos `opc-*` deixaram de ser opcionais: a rodada de desenvolvimento passa a ter 31 casos. Com o
+Claude, os dois passam usando a ferramenta nova (antes ele somava chamando `detalhes_produto` um a um).
+
+## Experimento: tirar o classificador (30/10/2026)
+
+`src/garantiafacil/conversa_agente.py` (`ConversaAgente`): um agente só, sem a chamada que classifica a
+pergunta. Recebe as ferramentas do cadastro (incluindo `total_gasto`) mais `consultar_documentos` (o RAG
+como ferramenta: sem produto busca no CDC; com produto, no termo dele, ou na garantia legal se não
+houver termo) e guarda as últimas 6 mensagens para perguntas de seguimento. Não toca o chat atual:
+`uv run python -m avaliacao.rodar --modo agente [--conjunto teste]`.
+
+| Chat (`claude-haiku-5-5`) | Desenvolvimento (31) | Teste (30) | Total (61) | Tempo médio |
+|---|---|---|---|---|
+| com classificador | 31 (100%) | 25 (83%) | 56 (92%) | 5 s |
+| agente decide tudo | 29 (94%) | 28 (93%) | 57 (93%) | 4 s |
+
+**Leitura honesta:** empate técnico no total (1 caso de diferença). A diferença que importa é onde cada
+um erra:
+- O classificador perdia no teste exatamente por **roteamento**: 5 falhas, todas de rota errada. O agente
+  zerou essa classe de erro: no teste, 28/30.
+- As 4 falhas do agente (`cad-09` e `termo-02` no desenvolvimento; `t-termo-02` e `t-termo-05` no teste)
+  vêm de como a régua mede: ele chamou `listar_produtos` antes de `consultar_documentos` para achar o
+  nome do produto, e a régua conta qualquer ferramenta do cadastro como "rota agente".
+  O texto de `termo-02` e dos dois do teste está certo. Em `cad-09` listou os 5 produtos em vez de
+  filtrar por categoria e respondeu certo. Não mudei a régua depois de ver isso (seria ajustar a
+  medida ao resultado); fica registrado como limite dela.
+- Nenhum dos 61 casos precisou da "rede de segurança" nem das regras de palavras ("vence", "paguei").
+
+**Custo:** o agente faz mais chamadas ao modelo por pergunta (muitas vezes lista os produtos antes de
+consultar o termo). Não medi tokens; o tempo médio ficou igual porque o Claude é rápido.
+
+**Não medido, e provavelmente o ponto fraco:** o `llama3.2:3b` com várias ferramentas. O classificador
+existe por causa dele (a avaliação 1 mostrou que escolher ferramentas com 2 perguntas sim/não falhava).
+
+**Pendências do modo agente antes de adotar:** a pergunta "De qual produto?" com opções numeradas
+("responda 2") não existe nele (o histórico cobre "a tv", mas não "2"); o texto da resposta não passa por
+`limpar_citacoes`; e falta rodar com o Ollama.
+
+Não troquei o chat do app. Decisão pendente: adotar o agente para o Claude e manter o classificador
+para o Ollama (`CHAT_MODO`), ou manter só o classificador.
+
+**Decisão (30/10): adotado com chave.** O app usa `criar_conversa` (`conversa_agente.py`), que lê
+`CHAT_MODO` no `.env`: `agente` ou `classificador`. Vazio = agente com o Claude e classificador com o
+Ollama (onde o agente não foi medido). Voltar ao chat antigo: `CHAT_MODO=classificador`.

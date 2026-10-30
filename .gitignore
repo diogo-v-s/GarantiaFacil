@@ -12,6 +12,7 @@ __pycache__/
 data/*.db
 data/chroma/
 data/backup-*/
+data/cache_assistencias/
 data/comprovantes/*
 !data/comprovantes/.gitkeep
 

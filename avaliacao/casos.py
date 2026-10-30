@@ -1,6 +1,7 @@
 """Casos de avaliação do chat. Cada caso diz o que se espera, não o texto exato da resposta.
 
-Situação dos produtos da base de avaliação em 28/10/2026 (ver base.py):
+Situação dos produtos da base de avaliação em 28/10/2026 (ver base.py). Os vencimentos abaixo são
+o fim de TODA a cobertura (prazo do fabricante + 90 dias da garantia legal):
   Geladeira Brastemp   vigente, vence 10/03/2027      (sem termo)
   Smart TV Samsung 50  vigente, vence 15/12/2026      (COM termo; 48 dias)
   Furadeira Bosch      vence em breve, 20/11/2026     (sem termo; 23 dias)
@@ -38,7 +39,7 @@ CASOS = [
     Caso("cad-09-ferramentas", "cadastro", ["tenho alguma ferramenta cadastrada?"], "agente",
          ferramenta="listar_produtos", argumentos={"categoria": "Ferramentas"}, contem=("Furadeira",)),
     Caso("cad-10-data-compra", "cadastro", ["quando comprei a furadeira?"], "agente",
-         ferramenta="detalhes_produto", contem=("20/11/2025",)),
+         ferramenta="detalhes_produto", contem=("22/08/2025",)),
     Caso("cad-11-primeiro-a-vencer", "cadastro", ["qual produto vence primeiro?"], "agente",
          ferramenta=("vencimentos_proximos", "listar_produtos"), contem=("Furadeira",)),
 
@@ -88,9 +89,9 @@ CASOS = [
          ["quais produtos estão na garantia?", "e quais já venceram?"], "agente",
          ferramenta="listar_produtos", argumentos={"status": "vencida"}, contem=("iPhone",)),
 
-    # ---------- opcionais: dependem do exercício (ferramenta total_gasto) ----------
+    # ---------- ferramenta total_gasto (era o exercício do usuário; agora entra na nota) ----------
     Caso("opc-01-gasto-eletronicos", "opcional", ["quanto gastei com eletrônicos?"], "agente",
-         ferramenta="total_gasto", contem_algum=("14348", "14.348"), opcional=True),
+         ferramenta="total_gasto", contem_algum=("14348", "14.348")),
     Caso("opc-02-gasto-total", "opcional", ["quanto gastei no total?"], "agente",
-         ferramenta="total_gasto", contem_algum=("18307", "18.307"), opcional=True),
+         ferramenta="total_gasto", contem_algum=("18307", "18.307")),
 ]  # fmt: skip

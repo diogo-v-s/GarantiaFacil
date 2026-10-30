@@ -221,3 +221,49 @@ def test_claude_agrupa_os_resultados_e_devolve_o_id_da_chamada(monkeypatch):
     assert capturado["messages"][1]["content"][0]["type"] == "tool_use"  # sem bloco de texto vazio
     assert capturado["tools"][0]["input_schema"]["properties"].keys() == {"a", "b"}
     assert passo.texto == "ok" and passo.chamadas == [Chamada("toolu_9", "somar", {"a": 1, "b": 1})]
+
+
+# ---------- total_gasto ----------
+
+
+def _cadastrar_com_valor(repo, nome, valor, categoria):
+    repo.adicionar(
+        Produto(nome=nome, loja="Loja", data_compra=HOJE, prazo_garantia_meses=12, valor=valor,
+                categoria=categoria)  # fmt: skip
+    )
+
+
+def test_total_gasto_soma_tudo_e_avisa_o_que_nao_tem_valor(repo):
+    # a fixture tem 3 produtos sem valor informado
+    _cadastrar_com_valor(repo, "TV", 2899.00, Categoria.ELETRONICOS)
+    _cadastrar_com_valor(repo, "Furadeira", 459.90, Categoria.FERRAMENTAS)
+
+    resultado = ferramenta(repo, "total_gasto")()
+
+    assert resultado["categoria"] == "todas"
+    assert resultado["total_gasto"] == "R$ 3.358,90"
+    assert resultado["produtos_somados"] == 2
+    assert resultado["produtos_sem_valor_informado"] == ["Geladeira Brastemp", "Moto G60", "Xbox Series S"]
+
+
+def test_total_gasto_por_categoria_aceita_sem_acento(repo):
+    _cadastrar_com_valor(repo, "TV", 2899.00, Categoria.ELETRONICOS)
+    _cadastrar_com_valor(repo, "iPhone", 7299.00, Categoria.ELETRONICOS)
+    _cadastrar_com_valor(repo, "Furadeira", 459.90, Categoria.FERRAMENTAS)
+
+    resultado = ferramenta(repo, "total_gasto")(categoria="eletronicos")
+
+    assert resultado["categoria"] == "Eletrônicos"
+    assert resultado["total_gasto"] == "R$ 10.198,00"
+    assert resultado["produtos_somados"] == 2
+    assert "Furadeira" not in resultado["produtos_sem_valor_informado"]
+
+
+def test_total_gasto_com_categoria_invalida_devolve_erro_com_as_opcoes(repo):
+    assert "erro" in ferramenta(repo, "total_gasto")(categoria="Comidas")
+
+
+def test_total_gasto_sem_nenhum_valor_e_zero(repo):
+    resultado = ferramenta(repo, "total_gasto")()
+
+    assert resultado["total_gasto"] == "R$ 0,00" and resultado["produtos_somados"] == 0

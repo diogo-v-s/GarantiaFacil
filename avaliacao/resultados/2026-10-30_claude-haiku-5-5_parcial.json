@@ -1,0 +1,43 @@
+{
+  "modelo": "claude-haiku-5-5",
+  "data_simulada": "2026-10-28",
+  "nota": "0/0",
+  "resultados": [
+    {
+      "caso": "opc-01-gasto-eletronicos",
+      "tipo": "opcional",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "total_gasto",
+          {
+            "categoria": "Eletrônicos"
+          }
+        ]
+      ],
+      "texto": "Você gastou **R$ 14.348,00** com eletrônicos, somando 3 produtos. Todos os produtos dessa categoria têm valor informado.",
+      "segundos": 7.965061800001422,
+      "opcional": true,
+      "produto": null
+    },
+    {
+      "caso": "opc-02-gasto-total",
+      "tipo": "opcional",
+      "passou": true,
+      "falhas": [],
+      "rota": "agente",
+      "ferramentas": [
+        [
+          "total_gasto",
+          {}
+        ]
+      ],
+      "texto": "Você gastou **R$ 18.307,80** no total, somando 5 produtos cadastrados. Nenhum produto ficou sem valor informado.",
+      "segundos": 4.4763257000013255,
+      "opcional": true,
+      "produto": null
+    }
+  ]
+}

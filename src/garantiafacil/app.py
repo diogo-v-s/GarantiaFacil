@@ -14,7 +14,9 @@ import altair as alt
 import pandas as pd
 import streamlit as st
 
-from garantiafacil.conversa import Conversa, Mensagem
+from garantiafacil.assistencias import ErroDeBusca, buscar_assistencias, localizar_cidade
+from garantiafacil.conversa import Mensagem
+from garantiafacil.conversa_agente import criar_conversa
 from garantiafacil.db import conectar
 from garantiafacil.documentos import extrair_paginas
 from garantiafacil.fotos import ARQUIVO, CAMERA, ORIGENS, SEM_FOTO, foto_escolhida
@@ -61,7 +63,8 @@ PAGINA_LISTA = "📦  Meus produtos"
 PAGINA_PAINEL = "📊  Painel"
 PAGINA_CADASTRO = "➕  Cadastrar"
 PAGINA_PERGUNTAS = "💬  Perguntas"
-PAGINAS = [PAGINA_LISTA, PAGINA_PAINEL, PAGINA_CADASTRO, PAGINA_PERGUNTAS]
+PAGINA_ASSISTENCIAS = "📍  Onde acionar"
+PAGINAS = [PAGINA_LISTA, PAGINA_PAINEL, PAGINA_CADASTRO, PAGINA_PERGUNTAS, PAGINA_ASSISTENCIAS]
 ALTURA_QUADRO = 380  # os dois quadros de gráfico do painel têm a mesma altura
 
 # status -> (classe de cor, título, texto antes da data)
@@ -1207,9 +1210,9 @@ def tela_perguntas(repo: Repositorio, base: BaseConhecimento, indexacao: dict):
     cabecalho("Como posso ajudar?", "Pergunte sobre suas garantias e seus direitos de consumidor.")
 
     if "conversa" not in st.session_state:
-        st.session_state["conversa"] = Conversa(repo, base, criar_llm())
+        st.session_state["conversa"] = criar_conversa(repo, base, criar_llm())
         st.session_state["historico"] = []
-    conversa: Conversa = st.session_state["conversa"]
+    conversa = st.session_state["conversa"]
     historico: list = st.session_state["historico"]
 
     # A caixa de texto fica fixa no rodapé da página, onde quer que seja chamada. Chamamos antes de
@@ -1245,6 +1248,48 @@ def tela_perguntas(repo: Repositorio, base: BaseConhecimento, indexacao: dict):
 
     historico.append(("assistant", resposta))
     mostrar_mensagem("assistant", resposta)
+
+
+def tela_assistencias(repo: Repositorio):
+    cabecalho("Onde acionar a garantia", "Assistências e lojas perto de você, a partir do mapa aberto.")
+    produtos = repo.listar()
+    if not produtos:
+        estado_vazio("📦", "Nenhum produto ainda", "Cadastre um produto para ver onde acioná-lo.")
+        return
+
+    produto = st.selectbox("Produto", produtos, format_func=lambda p: p.nome)
+    coluna_cidade, coluna_marca = st.columns(2)
+    cidade = coluna_cidade.text_input("Sua cidade", key="cidade_assistencia", placeholder="Ex.: Campinas, SP")
+    marca = coluna_marca.text_input("Marca (opcional)", placeholder="Ex.: Samsung")
+    if not st.button("Buscar assistências", type="primary", disabled=not cidade.strip()):
+        return
+
+    try:
+        with st.spinner("Buscando no mapa... a primeira busca de uma cidade pode levar cerca de 1 minuto."):
+            local = localizar_cidade(cidade)
+            if local is None:
+                st.warning(f"Não encontrei '{cidade}'. Tente com a cidade e o estado.")
+                return
+            achadas = buscar_assistencias(local, produto.categoria, marca)
+    except ErroDeBusca as erro:
+        st.error(str(erro))
+        return
+
+    st.caption(f"Perto de {local.nome}")
+    if not achadas:
+        st.info("Não encontrei nada no mapa para esta categoria nesta região.")
+    for assistencia in achadas:
+        with st.container(border=True):
+            selo = " ✅ marca confere" if assistencia.marca_confere else ""
+            st.markdown(f"**{assistencia.nome}**{selo}")
+            st.write(f"{assistencia.endereco} · {assistencia.distancia_km} km")
+            st.write(f"Telefone: {assistencia.telefone}")
+            if assistencia.site:
+                st.markdown(f"[Site]({assistencia.site})")
+    st.caption(
+        "Dados do OpenStreetMap, feitos por voluntários: podem estar incompletos ou desatualizados. "
+        "Confirme por telefone ou no site do fabricante antes de ir."
+    )
 
 
 def _pagina():
@@ -1331,6 +1376,8 @@ def _pagina():
         tela_cadastro(repo)
     elif pagina == PAGINA_PERGUNTAS:
         tela_perguntas(repo, base, indexacao)
+    elif pagina == PAGINA_ASSISTENCIAS:
+        tela_assistencias(repo)
     else:
         tela_lista(repo, base)
 

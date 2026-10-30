@@ -162,3 +162,19 @@ def test_resumo_ignora_opcionais_agrupa_por_tipo_e_lista_falhas():
     assert [r.caso for r in resumo.falhas] == ["b"] and [r.caso for r in resumo.opcionais] == ["d"]
     texto = formatar(resumo)
     assert "2/3" in texto and "[b]" in texto and "Opcionais" in texto
+
+
+# ---------- conjunto de teste separado ----------
+
+
+def test_conjunto_de_teste_nao_repete_caso_nem_pergunta_do_desenvolvimento():
+    from avaliacao.casos import CASOS
+    from avaliacao.casos_teste import CASOS_TESTE
+
+    ids = [c.id for c in CASOS + CASOS_TESTE]
+    assert len(ids) == len(set(ids))
+
+    def perguntas(casos):
+        return {m.strip().lower() for c in casos for m in c.mensagens}
+
+    assert perguntas(CASOS) & perguntas(CASOS_TESTE) == set()
