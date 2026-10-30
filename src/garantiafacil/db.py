@@ -97,6 +97,26 @@ CREATE TABLE IF NOT EXISTS trechos (
     vetor BLOB NOT NULL
 );
 
+-- Lembretes que o usuário programa para um produto ("levar na assistência dia 5"). Os avisos de
+-- vencimento da garantia não ficam aqui: são calculados na hora (ver avisos.py).
+CREATE TABLE IF NOT EXISTS lembretes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    produto_id INTEGER NOT NULL REFERENCES produtos(id) ON DELETE CASCADE,
+    data TEXT NOT NULL,                   -- ISO: AAAA-MM-DD, quando avisar
+    texto TEXT NOT NULL,
+    concluido INTEGER NOT NULL DEFAULT 0  -- 1 = o usuário já resolveu
+);
+
+-- Avisos de vencimento que o usuário já marcou como lidos. A chave identifica o aviso (produto, data
+-- de vencimento e faixa de antecedência), então ele volta sozinho se a situação mudar (ver notificacoes.py).
+CREATE TABLE IF NOT EXISTS notificacoes_lidas (
+    usuario_id INTEGER NOT NULL REFERENCES usuarios(id) ON DELETE CASCADE,
+    produto_id INTEGER NOT NULL REFERENCES produtos(id) ON DELETE CASCADE,
+    chave TEXT NOT NULL,
+    PRIMARY KEY (usuario_id, chave)
+);
+
 CREATE TABLE IF NOT EXISTS comprovantes (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     produto_id INTEGER NOT NULL REFERENCES produtos(id) ON DELETE CASCADE,

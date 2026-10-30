@@ -5,6 +5,7 @@ description = "Organizador de notas fiscais e garantias, projeto de estudo de LL
 requires-python = ">=3.12"
 dependencies = [
     "anthropic",
+    "mcp>=2.3.0",
     "ollama",
     "opencv-python-headless",
     "pydantic",

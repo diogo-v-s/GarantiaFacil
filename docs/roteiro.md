@@ -46,8 +46,29 @@ Marque cada etapa ao concluir. Em cada uma: conceito, código feito junto e um e
             chat atual, sem os erros de rota; adotado no app com a chave CHAT_MODO: agente com o
             Claude, classificador com o Ollama, que ainda falta medir no modo agente)
       - [x] Ferramenta `total_gasto` (exercício)
-      - [ ] Chat que age (lembretes e cadastro com confirmação)
-      - [ ] Servidor MCP próprio
+      - [x] Chat que age: cadastro com confirmação (30/10). O agente só PROPÕE (`propor_cadastro`,
+            nada é gravado); um cartão com Confirmar/Cancelar grava, e é o código quem grava, nunca
+            o modelo. Só no modo agente. Testado no Chrome
+      - [x] Chat que age: excluir produto e mudar categoria/prazo com confirmação (mesmo cartão;
+            `propor_exclusao` e `propor_alteracao`; só um pendente por vez). Testado no Chrome.
+            Achou e corrigiu um bug antigo: o seletor de categoria dos detalhes regravava o valor
+            velho do widget e desfazia mudanças feitas por fora (agora o banco manda, on_change grava)
+      - [x] Sininho de notificações (30/10): selo vermelho com a quantidade e janelinha no rodapé do
+            menu. Dois tipos: aviso de vencimento (automático, calculado na hora pela antecedência
+            das Preferências) e lembrete programado (tabela nova `lembretes`: produto, data, texto,
+            concluído). Lembrete criado pelo chat com confirmação (`propor_lembrete`, só de hoje em
+            diante) e aparece no sino a partir da data. Só dentro do app; e-mail fica para a etapa 12.
+            Cada notificação tem o botão "Lido" (e há "Marcar todas como lidas"): no lembrete conclui,
+            no aviso guarda a leitura (tabela `notificacoes_lidas`; a chave tem produto, vencimento e
+            faixa, então o aviso volta ao entrar na faixa de 7 dias ou se a data mudar). Testado no Chrome
+      - [ ] Lembrete também pela tela do produto (campo data + texto) e avisos por e-mail (etapa 12)
+      - [x] Chat flutuante: botão redondo em todas as telas (menos na aba Perguntas) que abre o
+            mesmo chat, com o mesmo histórico (pedido de 30/10)
+      - [x] Servidor MCP próprio (`servidor_mcp.py`): as 4 ferramentas de consulta (só leitura)
+            viram um servidor MCP por stdio, para o Claude Code ou o Claude Desktop usarem; a conta
+            vem de TAGUARDADO_EMAIL. Não expõe cadastrar/excluir/alterar (sem cartão de confirmação
+            o modelo gravaria sem você ver). Testado com um cliente MCP real (processo à parte).
+            Como registrar no Claude Code: está no topo de `servidor_mcp.py`
 - [ ] **11. Onde acionar a garantia** — assistências que atendem o produto (nome, endereço, contato),
       buscadas na internet perto do endereço do usuário. Pedido de 30/10; ainda não detalhado.
       - [ ] Endereço no perfil (opcional; decidido em 30/10: se houver, é o padrão da busca; se não,

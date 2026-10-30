@@ -142,6 +142,12 @@ class Usuarios:
             return None
         return _linha_para_usuario(linha)
 
+    def obter_por_email(self, email: str) -> Usuario | None:
+        linha = self.conexao.execute(
+            "SELECT * FROM usuarios WHERE email = ?", (normalizar_email(email),)
+        ).fetchone()
+        return _linha_para_usuario(linha) if linha else None
+
     def obter(self, usuario_id: int) -> Usuario | None:
         linha = self.conexao.execute(
             "SELECT * FROM usuarios WHERE id = ?", (usuario_id,)

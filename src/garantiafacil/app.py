@@ -31,7 +31,9 @@ from garantiafacil.garantia import (
 )
 from garantiafacil.avisos import OPCOES_DIAS, avisos_de_vencimento, quando
 from garantiafacil.cpf_cnpj import formatar_cnpj, formatar_cpf, formatar_telefone
+from garantiafacil.lembretes import Lembretes, NotificacoesLidas
 from garantiafacil.llm import criar_llm
+from garantiafacil.notificacoes import montar_notificacoes
 from garantiafacil.imagens import imagem_padrao
 from garantiafacil.modelos import Categoria, Produto, TipoDocumento, TipoPessoa
 from garantiafacil.painel import (
@@ -248,6 +250,26 @@ ESTILO = """
 .status.ok { background: var(--ok-bg); color: var(--ok); }
 .status.aviso { background: var(--aviso-bg); color: var(--aviso); }
 .status.vencida { background: var(--erro-bg); color: var(--erro); }
+/* chat flutuante: botão redondo no canto, a janela abre acima dele */
+.st-key-chat_flutuante { position: fixed; bottom: 24px; right: 24px; z-index: 999990; width: auto; }
+.st-key-chat_flutuante [data-testid="stPopover"] > div > button {
+    width: 56px; height: 56px; border-radius: 50%; background: var(--primaria); color: #fff;
+    border: none; box-shadow: 0 4px 14px rgba(0,0,0,0.3);
+}
+.st-key-chat_flutuante [data-testid="stPopover"] > div > button:hover { filter: brightness(1.1); }
+[data-testid="stPopoverBody"]:has(.st-key-chat_flutuante_corpo) { width: min(420px, 92vw); }
+/* sino: selo vermelho com a quantidade de notificações no canto do ícone */
+.st-key-sino { position: relative; }
+.st-key-sino [data-testid="stElementContainer"]:has(.selo-sino) {
+    position: absolute; top: -4px; right: 6px; width: auto; z-index: 2; pointer-events: none;
+}
+.st-key-sino .selo-sino {
+    min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: #ef4444;
+    color: #fff; font-size: 0.7rem; font-weight: 700; display: flex; align-items: center;
+    justify-content: center;
+}
+/* sininho: a janelinha das notificações é mais larga que a do perfil */
+[data-testid="stPopoverBody"]:has(.st-key-sininho_corpo) { width: min(340px, 92vw); }
 </style>
 """
 
@@ -695,6 +717,10 @@ def guardar_documento(repo: Repositorio, base: BaseConhecimento, produto: Produt
     st.rerun()
 
 
+def _salvar_categoria(repo: Repositorio, produto_id: int, chave: str):
+    repo.atualizar_categoria(produto_id, st.session_state[chave])
+
+
 def mostrar_detalhes(repo: Repositorio, base: BaseConhecimento, produto: Produto):
     """Conteúdo do 'Detalhes e documentos' de um produto."""
     dias = dias_restantes(produto)
@@ -713,17 +739,20 @@ def mostrar_detalhes(repo: Repositorio, base: BaseConhecimento, produto: Produto
         st.write(f"**Observações:** {produto.observacoes}")
     _sugestao_de_prazo(repo, produto)
 
-    nova_categoria = st.selectbox(
+    # O banco manda: a cada execução o seletor volta a mostrar a categoria gravada (o chat também a
+    # altera) e só grava quando o usuário mexe nele (on_change). Comparar o valor do widget com o do
+    # banco a cada execução desfazia mudanças feitas por fora.
+    chave_categoria = f"categoria_{produto.id}"
+    st.session_state[chave_categoria] = produto.categoria
+    st.selectbox(
         "Categoria",
         list(Categoria),
-        index=list(Categoria).index(produto.categoria) if produto.categoria else None,
         placeholder="Sem categoria",
         format_func=lambda c: c.value,
-        key=f"categoria_{produto.id}",
+        key=chave_categoria,
+        on_change=_salvar_categoria,
+        args=(repo, produto.id, chave_categoria),
     )
-    if nova_categoria != produto.categoria:
-        repo.atualizar_categoria(produto.id, nova_categoria)
-        st.rerun()
 
     nova_foto = seletor_de_foto(
         f"detalhe_{produto.id}_{st.session_state.get('foto_n', 0)}", "Foto do produto (enviar ou trocar)"
@@ -1206,14 +1235,73 @@ def _sugestoes_de_perguntas(repo: Repositorio):
         st.caption("Cadastre um produto para também poder perguntar sobre as suas garantias.")
 
 
-def tela_perguntas(repo: Repositorio, base: BaseConhecimento, indexacao: dict):
-    cabecalho("Como posso ajudar?", "Pergunte sobre suas garantias e seus direitos de consumidor.")
+def _cartao_da_proposta(conversa, historico: list, chave: str = "pagina"):
+    """Cadastro, exclusão ou alteração que o agente preparou: só acontece se o usuário clicar em Confirmar."""
+    proposta = getattr(conversa, "proposta", None)  # o chat com classificador não propõe nada
+    acao = getattr(conversa, "acao", None)
+    if proposta is not None:
+        valor = f"R$ {proposta.valor:,.2f}" if proposta.valor is not None else "não informado"
+        categoria = proposta.categoria.value if proposta.categoria else "sem categoria"
+        titulo = "Confira o cadastro"
+        texto = (
+            f"**{proposta.nome}** · {proposta.loja}  \n"
+            f"Comprado em {formatar_data(proposta.data_compra)} · garantia de "
+            f"{proposta.prazo_garantia_meses} meses · {valor} · {categoria}"
+        )
 
+        def confirmar() -> str:
+            salvo = conversa.confirmar_proposta()
+            return f"Cadastrei **{salvo.nome}**. Ele já aparece em Meus produtos."
+
+        cancelar, aviso_ao_cancelar = conversa.cancelar_proposta, "Tudo bem, não cadastrei nada."
+    elif acao is not None:
+        titulo, texto = "Confirme a ação", acao.descricao
+        confirmar = conversa.confirmar_acao
+        cancelar, aviso_ao_cancelar = conversa.cancelar_acao, "Tudo bem, não mudei nada."
+    else:
+        return
+
+    with st.chat_message("assistant"), st.container(border=True):
+        st.markdown(f"**{titulo}**")
+        st.write(texto)
+        coluna_confirmar, coluna_cancelar = st.columns(2)
+        if coluna_confirmar.button("Confirmar", type="primary", key=f"confirmar_{chave}"):
+            historico.append(("assistant", Mensagem(confirmar())))
+            st.rerun()
+        if coluna_cancelar.button("Cancelar", key=f"cancelar_{chave}"):
+            cancelar()
+            historico.append(("assistant", Mensagem(aviso_ao_cancelar)))
+            st.rerun()
+
+
+def _obter_chat(repo: Repositorio, base: BaseConhecimento):
+    """A conversa e o histórico da sessão: a aba Perguntas e o chat flutuante usam os mesmos."""
     if "conversa" not in st.session_state:
         st.session_state["conversa"] = criar_conversa(repo, base, criar_llm())
         st.session_state["historico"] = []
-    conversa = st.session_state["conversa"]
-    historico: list = st.session_state["historico"]
+    return st.session_state["conversa"], st.session_state["historico"]
+
+
+def _responder(conversa, historico: list, indexacao: dict, entrada: str) -> None:
+    """Mostra a pergunta, pede a resposta ao agente e mostra o resultado (ou o erro)."""
+    historico.append(("user", entrada))
+    mostrar_mensagem("user", entrada)
+    try:
+        with st.spinner("Pensando..."):
+            indexacao["thread"].join()  # só espera se o CDC ainda estiver sendo indexado
+            if indexacao["erro"]:
+                raise RuntimeError(f"não consegui indexar o CDC: {indexacao['erro']}")
+            resposta = conversa.responder(entrada)
+    except Exception as erro:  # Ollama fora do ar, modelo não baixado...
+        st.error(f"Não consegui responder: {erro}")
+        return
+    historico.append(("assistant", resposta))
+    mostrar_mensagem("assistant", resposta)
+
+
+def tela_perguntas(repo: Repositorio, base: BaseConhecimento, indexacao: dict):
+    cabecalho("Como posso ajudar?", "Pergunte sobre suas garantias e seus direitos de consumidor.")
+    conversa, historico = _obter_chat(repo, base)
 
     # A caixa de texto fica fixa no rodapé da página, onde quer que seja chamada. Chamamos antes de
     # desenhar para saber se há pergunta nova (digitada ou clicada nas sugestões).
@@ -1231,23 +1319,28 @@ def tela_perguntas(repo: Repositorio, base: BaseConhecimento, indexacao: dict):
 
     if not historico and not entrada:
         _sugestoes_de_perguntas(repo)
-    if not entrada:
-        return
+    if entrada:
+        _responder(conversa, historico, indexacao, entrada)
+    _cartao_da_proposta(conversa, historico)
 
-    historico.append(("user", entrada))
-    mostrar_mensagem("user", entrada)
-    try:
-        with st.spinner("Pensando..."):
-            indexacao["thread"].join()  # só espera se o CDC ainda estiver sendo indexado
-            if indexacao["erro"]:
-                raise RuntimeError(f"não consegui indexar o CDC: {indexacao['erro']}")
-            resposta = conversa.responder(entrada)
-    except Exception as erro:  # Ollama fora do ar, modelo não baixado...
-        st.error(f"Não consegui responder: {erro}")
-        return
 
-    historico.append(("assistant", resposta))
-    mostrar_mensagem("assistant", resposta)
+def chat_flutuante(repo: Repositorio, base: BaseConhecimento, indexacao: dict):
+    """Botão redondo no canto de todas as telas que abre o mesmo chat da aba Perguntas."""
+    conversa, historico = _obter_chat(repo, base)
+    with st.container(key="chat_flutuante"):
+        with st.popover("", icon=":material/chat:"):
+            with st.container(key="chat_flutuante_corpo"):
+                st.markdown("**Assistente TáGuardado**")
+                area = st.container(height=360, border=False)  # criada antes para ficar acima da caixa
+                entrada = st.chat_input("Pergunte ao assistente", key="entrada_flutuante")
+                with area:
+                    if not historico and not entrada:
+                        st.caption("Pergunte sobre suas garantias, seus direitos ou peça para cadastrar um produto.")
+                    for papel, conteudo in historico:
+                        mostrar_mensagem(papel, conteudo)
+                    if entrada:
+                        _responder(conversa, historico, indexacao, entrada)
+                    _cartao_da_proposta(conversa, historico, chave="flutuante")
 
 
 def tela_assistencias(repo: Repositorio):
@@ -1290,6 +1383,42 @@ def tela_assistencias(repo: Repositorio):
         "Dados do OpenStreetMap, feitos por voluntários: podem estar incompletos ou desatualizados. "
         "Confirme por telefone ou no site do fabricante antes de ir."
     )
+
+
+def _marcar_lida(lembretes: Lembretes, lidas: NotificacoesLidas, notificacoes: list):
+    """Limpa as notificações dadas: conclui o lembrete ou guarda o aviso de vencimento como lido."""
+    for n in notificacoes:
+        if n.lembrete_id is not None:
+            lembretes.concluir(n.lembrete_id)
+        else:
+            lidas.marcar(n.produto_id, n.chave)
+
+
+def sininho(repo: Repositorio, lembretes: Lembretes, lidas: NotificacoesLidas, usuario):
+    """Sino do menu: o número é a quantidade de notificações; a janelinha lista cada uma, com "Lido"."""
+    notificacoes = montar_notificacoes(
+        repo.listar(), lembretes.pendentes(), date.today(), usuario.avisar_dias, lidas.chaves()
+    )
+    with st.container(key="sino"):
+        with st.popover("", icon=":material/notifications:", use_container_width=True):
+            with st.container(key="sininho_corpo"):
+                if not notificacoes:
+                    st.caption("Nenhuma notificação por enquanto.")
+                if len(notificacoes) > 1:
+                    st.button(
+                        "Marcar todas como lidas", key="lidas_todas", icon=":material/done_all:",
+                        on_click=_marcar_lida, args=(lembretes, lidas, notificacoes),
+                    )  # fmt: skip
+                for i, notificacao in enumerate(notificacoes):
+                    icone = "📌" if notificacao.tipo == "lembrete" else ("⚠️" if notificacao.urgente else "🔔")
+                    st.markdown(f"{icone} {notificacao.texto}")
+                    st.button(
+                        "Lido", key=f"lida_{i}_{notificacao.chave or notificacao.lembrete_id}",
+                        icon=":material/check:", on_click=_marcar_lida,
+                        args=(lembretes, lidas, [notificacao]),
+                    )  # fmt: skip
+        if notificacoes:  # o número num selo sobre o sino (dentro do botão ele ficava cortado)
+            st.html(f'<span class="selo-sino">{len(notificacoes)}</span>')
 
 
 def _pagina():
@@ -1345,7 +1474,13 @@ def _pagina():
             on_change=_fechar_tela_da_conta,
         )  # fmt: skip
         with st.container(key="rodape_usuario"):
-            coluna_menu, coluna_sair = st.columns([5, 1], vertical_alignment="center", gap="small")
+            coluna_menu, coluna_sino, coluna_sair = st.columns(
+                [4, 2, 1], vertical_alignment="center", gap="small"
+            )
+            with coluna_sino:
+                sininho(
+                    repo, Lembretes(conexao, usuario.id), NotificacoesLidas(conexao, usuario.id), usuario
+                )
             with coluna_menu.popover(
                 usuario.nome, icon=":material/account_circle:", use_container_width=True
             ):
@@ -1380,6 +1515,9 @@ def _pagina():
         tela_assistencias(repo)
     else:
         tela_lista(repo, base)
+
+    if pagina != PAGINA_PERGUNTAS:  # lá o chat já ocupa a tela
+        chat_flutuante(repo, base, indexacao)
 
 
 @st.fragment(run_every=2)
